@@ -19,13 +19,13 @@ def test_create_tool_registry_uses_base_handlers() -> None:
     base_registry = tool_registry.create_tool_registry()
     server_registry = mcp_server.create_tool_registry()
 
-    for name in ("search_products", "support_knowledge_search"):
+    for name in ("search_products",):
         assert server_registry[name].handler is base_registry[name].handler
 
 
 def test_resolve_widget_page_varies_by_tool() -> None:
     assert tool_registry._resolve_widget_page("search_products") == "search"
-    assert tool_registry._resolve_widget_page("support_knowledge_search") == "support"
+    assert tool_registry._resolve_widget_page("unknown_tool") == "default"
 
 
 def test_inline_local_widget_assets_inlines_local_files() -> None:
@@ -267,7 +267,7 @@ def test_log_mcp_request_safe_includes_error_message(
                 "jsonrpc": "2.0",
                 "id": "1",
                 "method": "tools/call",
-                "params": {"name": "support_knowledge_search", "arguments": {"query": "help"}},
+                "params": {"name": "search_products", "arguments": {"query": "help"}},
             },
             True,
         ),

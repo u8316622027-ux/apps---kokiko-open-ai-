@@ -15,6 +15,8 @@ from app.domain.products.service import ProductSearchService
 from app.interfaces.mcp.tools.apteka_urls import build_front_url, get_apteka_base_url
 
 APTEKA_SEARCH_PATH = "/search"
+APTEKA_MARKET_HEADER_NAME = "market"
+APTEKA_MARKET_HEADER_VALUE = "kokikomd"
 
 
 class AptekaSearchRepository(ProductSearchRepository):
@@ -39,7 +41,10 @@ class AptekaSearchRepository(ProductSearchRepository):
             url=self._base_url,
             data=payload,
             method="POST",
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                APTEKA_MARKET_HEADER_NAME: APTEKA_MARKET_HEADER_VALUE,
+            },
         )
         with self._urlopen(request, timeout=self._timeout) as response:
             response_payload = json.loads(response.read().decode("utf-8"))

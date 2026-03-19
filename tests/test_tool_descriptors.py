@@ -29,11 +29,8 @@ def test_tool_descriptor_includes_invocation_messages() -> None:
 
 def test_tool_descriptor_readonly_annotations() -> None:
     registry = tool_registry.create_tool_registry()
-    search_payload = tool_registry.serialize_tool_definition(registry["search_products"])
-    support_payload = tool_registry.serialize_tool_definition(registry["support_knowledge_search"])
-
-    assert search_payload["annotations"]["readOnlyHint"] is True
-    assert support_payload["annotations"]["readOnlyHint"] is True
+    payload = tool_registry.serialize_tool_definition(registry["search_products"])
+    assert payload["annotations"]["readOnlyHint"] is True
 
 
 def test_theme_tool_is_removed() -> None:

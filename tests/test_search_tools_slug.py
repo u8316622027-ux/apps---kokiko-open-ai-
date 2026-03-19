@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+
+from app.interfaces.mcp.tools.search_tools import AptekaSearchRepository
 from app.interfaces.mcp.tools.search_tools import _map_product, _product_to_dict
 
 
@@ -41,3 +44,31 @@ def test_search_tool_prefers_language_specific_name() -> None:
 
     assert payload_ru["name"] == "Русское название"
     assert payload_ro["name"] == "Nume romanesc"
+
+
+def test_search_repository_sends_market_header() -> None:
+    captured: dict[str, object] = {}
+
+    def _fake_urlopen(request, timeout=0):  # type: ignore[no-untyped-def]
+        captured["url"] = request.full_url
+        captured["headers"] = dict(request.header_items())
+        captured["timeout"] = timeout
+
+        class _Response:
+            def __enter__(self):  # type: ignore[no-untyped-def]
+                return self
+
+            def __exit__(self, exc_type, exc, tb):  # type: ignore[no-untyped-def]
+                return False
+
+            def read(self):  # type: ignore[no-untyped-def]
+                return json.dumps({"items": []}).encode("utf-8")
+
+        return _Response()
+
+    repository = AptekaSearchRepository(urlopen=_fake_urlopen)
+    repository.search("test query")
+
+    headers = {key.lower(): value for key, value in captured["headers"].items()}
+    assert headers["content-type"] == "application/json"
+    assert headers["market"] == "kokikomd"

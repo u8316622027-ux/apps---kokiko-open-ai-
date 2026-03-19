@@ -7,7 +7,6 @@ from typing import Any, Callable
 
 from app.core.config import get_settings
 from app.interfaces.mcp.tools.apteka_urls import get_apteka_base_url
-from app.interfaces.mcp.tools.faq_tools import faq_search
 from app.interfaces.mcp.tools.search_tools import search_products
 
 
@@ -57,32 +56,8 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             ui=widget_ui_config,
             annotations={"readOnlyHint": True},
             tool_invocation={
-                "invoking": "Searching products…",
+                "invoking": "Searching products...",
                 "invoked": "Products found.",
-            },
-        ),
-        "support_knowledge_search": ToolDefinition(
-            name="support_knowledge_search",
-            title="Search support knowledge",
-            description=(
-                "Semantic FAQ knowledge search for support questions: order placement, "
-                "work schedule, app capabilities, payment, delivery, and account usage."
-            ),
-            input_schema={
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string"},
-                    "limit": {"type": "integer", "minimum": 1},
-                },
-                "required": ["query"],
-            },
-            handler=_support_knowledge_search_handler,
-            output_template="",
-            ui=widget_ui_config,
-            annotations={"readOnlyHint": True},
-            tool_invocation={
-                "invoking": "Searching support knowledge…",
-                "invoked": "Support knowledge found.",
             },
         ),
     }
@@ -153,8 +128,6 @@ def decorate_tool_result(
 def _resolve_widget_page(tool_name: str) -> str:
     if tool_name == "search_products":
         return "search"
-    if tool_name == "support_knowledge_search":
-        return "support"
     return "default"
 
 
@@ -190,10 +163,3 @@ def _search_products_handler(arguments: dict[str, Any]) -> dict[str, Any]:
     limit = int(arguments.get("limit", 10))
     language = arguments.get("language")
     return search_products(query, limit=limit, language=language)
-
-
-def _support_knowledge_search_handler(arguments: dict[str, Any]) -> dict[str, Any]:
-    query = str(arguments.get("query", ""))
-    limit_value = arguments.get("limit")
-    limit = int(limit_value) if limit_value is not None else None
-    return faq_search(query, limit=limit)

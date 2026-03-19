@@ -424,7 +424,7 @@ def _should_log_mcp_request(request_payload: Any) -> bool:
     if not isinstance(params, dict):
         return False
     tool_name = params.get("name")
-    if tool_name not in {"search_products", "support_knowledge_search"}:
+    if tool_name != "search_products":
         return False
     arguments = params.get("arguments")
     if not isinstance(arguments, dict):
