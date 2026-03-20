@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import json
 
-from app.interfaces.mcp.tools.search_tools import AptekaSearchRepository
-from app.interfaces.mcp.tools.search_tools import _map_product, _product_to_dict
+from app.interfaces.mcp.tools.search_tools import (
+    AptekaSearchRepository,
+    _map_product,
+    _product_to_dict,
+)
 
 
 def test_search_tool_maps_slug_from_meta_translations() -> None:

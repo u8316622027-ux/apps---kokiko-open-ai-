@@ -121,7 +121,7 @@
             ? `<p class="new-price">${toMoney(effectivePrice)}</p>`
             : '<p class="new-price is-unavailable">Нет в наличии</p>';
           const safeProductUrl = escapeHtml(
-            normalizeText(product.productUrl) || "https://www.apteka.md/",
+            normalizeText(product.productUrl) || "https://www.kokiko.md/",
           );
           const actionButton = inStock
             ? `<a class="buy-link" href="${safeProductUrl}" target="_blank" rel="noopener noreferrer">Купить</a>`

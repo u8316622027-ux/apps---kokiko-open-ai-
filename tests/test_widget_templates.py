@@ -53,14 +53,22 @@ class WidgetTemplateTests(unittest.TestCase):
         self.assertIn('id="products-support-layer"', template_text)
         self.assertIn('id="products-support-popup"', template_text)
         self.assertIn('id="products-support-close"', template_text)
-        self.assertIn("https://t.me/aptekamd_bot", template_text)
-        self.assertIn("viber://pa?chatURI=aptekamd_bot", template_text)
+        self.assertIn("https://www.facebook.com/kokiko.md/", template_text)
+        self.assertIn("https://www.instagram.com/kokiko.md", template_text)
 
     def test_products_template_renders_buy_links(self) -> None:
         template_text = self._read_products_bundle_text()
         self.assertIn('class="buy-link"', template_text)
         self.assertIn('target="_blank"', template_text)
         self.assertIn('rel="noopener noreferrer"', template_text)
+
+    def test_products_template_uses_kokiko_domain_for_product_links(self) -> None:
+        template_text = self._read_products_bundle_text()
+        self.assertIn('const getSiteBaseUrl = () => "https://www.kokiko.md";', template_text)
+        self.assertIn(
+            'normalizeText(product.productUrl) || "https://www.kokiko.md/"',
+            template_text,
+        )
 
     def test_products_template_includes_empty_state_copy(self) -> None:
         template_text = self._read_products_bundle_text()
@@ -107,9 +115,9 @@ class WidgetTemplateTests(unittest.TestCase):
     def test_products_template_includes_mobile_and_theme_tuning(self) -> None:
         template_text = self._read_products_bundle_text()
         self.assertIn("scroll-snap-type: x mandatory", template_text)
-        self.assertIn(':root[data-theme="light"]', template_text)
+        self.assertIn(':root[data-theme="dark"]', template_text)
         self.assertIn(
-            "--shadow-card: 0 6px 14px rgba(20, 40, 80, 0.12)",
+            "--kokiko-shadow-card: 0 10px 28px rgba(21, 35, 70, 0.16)",
             template_text,
         )
         self.assertIn("padding-bottom: 12px", template_text)
@@ -120,17 +128,17 @@ class WidgetTemplateTests(unittest.TestCase):
 
     def test_products_template_scales_product_images(self) -> None:
         template_text = self._read_products_bundle_text()
-        self.assertIn("transform: scale(1.05)", template_text)
+        self.assertIn("transform: scale(1.04)", template_text)
         self.assertIn("height: 208px", template_text)
         self.assertIn(
-            "grid-template-rows: 208px 66px 24px 22px 40px 38px",
+            "grid-template-rows: 208px 66px 24px 22px 42px 38px",
             template_text,
         )
 
     def test_products_template_mobile_toolbar_is_single_row(self) -> None:
         template_text = self._read_products_bundle_text()
         self.assertIn("@media (max-width: 520px)", template_text)
-        self.assertIn("grid-template-columns: 120px 1fr 44px", template_text)
+        self.assertIn("grid-template-columns: 122px 1fr 44px", template_text)
 
 
 if __name__ == "__main__":

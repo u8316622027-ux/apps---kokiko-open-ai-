@@ -152,7 +152,7 @@
       normalizeLanguage(state.language) ||
       getPreferredLanguage();
 
-    const getSiteBaseUrl = () => "https://www.apteka.md";
+    const getSiteBaseUrl = () => "https://www.kokiko.md";
 
     const normalizeAptekaHost = (url) => {
       const normalized = normalizeText(url);
@@ -160,8 +160,10 @@
         return "";
       }
       return normalized
-        .replace("https://api.apteka.md", "https://www.apteka.md")
-        .replace("http://api.apteka.md", "https://www.apteka.md");
+        .replace("https://api.apteka.md", "https://www.kokiko.md")
+        .replace("http://api.apteka.md", "https://www.kokiko.md")
+        .replace("https://www.apteka.md", "https://www.kokiko.md")
+        .replace("http://www.apteka.md", "https://www.kokiko.md");
     };
 
     const buildProductUrl = (rawUrl, slug, language) => {
