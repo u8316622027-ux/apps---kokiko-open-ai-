@@ -27,10 +27,12 @@ def test_tool_descriptor_includes_invocation_messages() -> None:
     assert payload["_meta"]["openai/toolInvocation/invoked"]
 
 
-def test_tool_descriptor_readonly_annotations() -> None:
+def test_tool_descriptor_annotations() -> None:
     registry = tool_registry.create_tool_registry()
     payload = tool_registry.serialize_tool_definition(registry["search_products"])
     assert payload["annotations"]["readOnlyHint"] is True
+    assert payload["annotations"]["openWorldHint"] is True
+    assert payload["annotations"]["destructiveHint"] is False
 
 
 def test_theme_tool_is_removed() -> None:
