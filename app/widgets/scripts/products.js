@@ -18,7 +18,17 @@
   }
 
   const { state, dom, ui, actions, tools, utils } = ctx;
-  const { input, searchButton, track, leftArrow, rightArrow } = dom;
+  const {
+    input,
+    searchButton,
+    track,
+    leftArrow,
+    rightArrow,
+    cartButton,
+    cartLayer,
+    cartPanel,
+    cartItems,
+  } = dom;
 
   const scrollTrack = (direction) => {
     if (!track) {
@@ -49,6 +59,58 @@
       event.stopPropagation();
       actions.openSupportPopup();
     }
+    if (target.dataset.action === "add-to-cart") {
+      event.preventDefault();
+      event.stopPropagation();
+      actions.addToCart(target.dataset.productId || "");
+    }
+  });
+
+  cartButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    actions.openCart();
+  });
+
+  cartPanel?.addEventListener("click", (event) => {
+    event.stopPropagation();
+  });
+
+  cartLayer?.addEventListener("click", (event) => {
+    if (event.target === cartLayer) {
+      actions.closeCart();
+    }
+  });
+
+  const cartCloseButton = document.getElementById("products-cart-close");
+  cartCloseButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    actions.closeCart();
+  });
+
+  cartItems?.addEventListener("click", (event) => {
+    const target =
+      event.target instanceof Element
+        ? event.target.closest("[data-action]")
+        : null;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    const productId = target.dataset.productId || "";
+    if (target.dataset.action === "cart-increase") {
+      event.preventDefault();
+      actions.changeCartQuantity(productId, 1);
+      return;
+    }
+    if (target.dataset.action === "cart-decrease") {
+      event.preventDefault();
+      actions.changeCartQuantity(productId, -1);
+      return;
+    }
+    if (target.dataset.action === "cart-remove") {
+      event.preventDefault();
+      actions.removeFromCart(productId);
+    }
   });
 
   searchButton?.addEventListener("click", (event) => {
@@ -68,10 +130,16 @@
   window.addEventListener("resize", ui.updateCarouselControls, {
     passive: true,
   });
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && state.cartOpen) {
+      actions.closeCart();
+    }
+  });
   if (typeof utils?.setLoading === "function") {
     utils.setLoading(true);
   }
   ui.renderProducts();
+  ui.renderCart();
   tools.waitForInitialPayload().then(() => {
     if (!state.loadedOnce) {
       state.loadedOnce = true;
@@ -80,6 +148,7 @@
       }
       ui.renderProducts();
     }
+    ui.renderCart();
     ui.updateCarouselControls();
   });
 })();

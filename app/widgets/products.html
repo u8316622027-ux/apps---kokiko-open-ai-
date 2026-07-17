@@ -54,21 +54,37 @@
                 </svg>
               </button>
             </label>
-            <button
-              class="support-button"
-              id="products-support-button"
-              type="button"
-              aria-label="Поддержка"
-              aria-controls="products-support-popup"
-              aria-expanded="false"
-            >
-              <svg class="products-icon products-icon--headset" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 13a8 8 0 0 1 16 0"></path>
-                <rect x="3.5" y="12" width="4" height="6" rx="1.5"></rect>
-                <rect x="16.5" y="12" width="4" height="6" rx="1.5"></rect>
-                <path d="M20.5 18.5a3.5 3.5 0 0 1-3.5 3.5H13"></path>
-              </svg>
-            </button>
+            <div class="toolbar-actions">
+              <button
+                class="cart-button"
+                id="products-cart-button"
+                type="button"
+                aria-label="Корзина, 0 товаров"
+                aria-controls="products-cart-panel"
+                aria-expanded="false"
+              >
+                <svg class="products-icon products-icon--cart" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M6 7h12l-1 12H7L6 7z"></path>
+                  <path d="M9 7a3 3 0 0 1 6 0"></path>
+                </svg>
+                <span class="cart-button-count" id="products-cart-count">0</span>
+              </button>
+              <button
+                class="support-button"
+                id="products-support-button"
+                type="button"
+                aria-label="Поддержка"
+                aria-controls="products-support-popup"
+                aria-expanded="false"
+              >
+                <svg class="products-icon products-icon--headset" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 13a8 8 0 0 1 16 0"></path>
+                  <rect x="3.5" y="12" width="4" height="6" rx="1.5"></rect>
+                  <rect x="16.5" y="12" width="4" height="6" rx="1.5"></rect>
+                  <path d="M20.5 18.5a3.5 3.5 0 0 1-3.5 3.5H13"></path>
+                </svg>
+              </button>
+            </div>
           </section>
 
           <div class="carousel-frame">
@@ -91,6 +107,49 @@
                 </svg>
               </button>
             </div>
+          </div>
+
+          <div class="products-cart-layer" id="products-cart-layer" hidden>
+            <aside
+              class="products-cart-panel"
+              id="products-cart-panel"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="products-cart-title"
+              tabindex="-1"
+            >
+              <header class="products-cart-header">
+                <div>
+                  <p class="products-cart-kicker">KoKiKo</p>
+                  <h2 class="products-cart-title" id="products-cart-title">Корзина</h2>
+                </div>
+                <button
+                  class="products-cart-close"
+                  id="products-cart-close"
+                  type="button"
+                  aria-label="Закрыть корзину"
+                >
+                  ×
+                </button>
+              </header>
+
+              <div class="products-cart-items" id="products-cart-items" aria-live="polite"></div>
+
+              <footer class="products-cart-footer">
+                <div class="products-cart-total-row">
+                  <span>Итого</span>
+                  <strong id="products-cart-total">0.00 MDL</strong>
+                </div>
+                <button
+                  class="products-cart-checkout"
+                  id="products-cart-checkout"
+                  type="button"
+                  disabled
+                >
+                  Оформить заказ
+                </button>
+              </footer>
+            </aside>
           </div>
 
           <div class="products-support-layer" id="products-support-layer" hidden>

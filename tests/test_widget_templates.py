@@ -58,7 +58,7 @@ class WidgetTemplateTests(unittest.TestCase):
 
     def test_products_template_renders_buy_links(self) -> None:
         template_text = self._read_products_bundle_text()
-        self.assertIn('class="buy-link"', template_text)
+        self.assertIn('class="buy-link product-details-link"', template_text)
         self.assertIn('target="_blank"', template_text)
         self.assertIn('rel="noopener noreferrer"', template_text)
 
@@ -79,13 +79,19 @@ class WidgetTemplateTests(unittest.TestCase):
         self.assertIn("--empty-card-bg", template_text)
         self.assertIn("--empty-icon-bg", template_text)
 
-    def test_products_template_removes_cart_and_checkout_ui(self) -> None:
+    def test_products_template_includes_cart_ui(self) -> None:
         template_text = self._read_products_bundle_text()
-        self.assertNotIn("products-cart-modal", template_text)
+        self.assertIn('id="products-cart-button"', template_text)
+        self.assertIn('id="products-cart-panel"', template_text)
+        self.assertIn('id="products-cart-items"', template_text)
+        self.assertIn('id="products-cart-total"', template_text)
+        self.assertIn('data-action="add-to-cart"', template_text)
+        self.assertIn('data-action="cart-increase"', template_text)
+        self.assertIn('data-action="cart-decrease"', template_text)
+        self.assertIn('data-action="cart-remove"', template_text)
         self.assertNotIn("products-page-checkout", template_text)
         self.assertNotIn("products-page-my-cart", template_text)
         self.assertNotIn("products-page-tracking", template_text)
-        self.assertNotIn("products-toast-layer", template_text)
 
     def test_products_template_includes_theme_script(self) -> None:
         html_text = Path("app/widgets/products.html").read_text(encoding="utf-8")
@@ -138,7 +144,7 @@ class WidgetTemplateTests(unittest.TestCase):
     def test_products_template_mobile_toolbar_is_single_row(self) -> None:
         template_text = self._read_products_bundle_text()
         self.assertIn("@media (max-width: 520px)", template_text)
-        self.assertIn("grid-template-columns: 122px 1fr 44px", template_text)
+        self.assertIn("grid-template-columns: 112px minmax(0, 1fr) auto", template_text)
 
 
 if __name__ == "__main__":

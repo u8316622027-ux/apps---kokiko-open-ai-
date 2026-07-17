@@ -3,12 +3,15 @@
     const INITIAL_PAYLOAD_WAIT_MS = 10000;
     const INITIAL_PAYLOAD_POLL_MS = 140;
     const FALLBACK_IMAGE_PATH = "/assets/images/placeholder-600x600.png";
+    const CART_STORAGE_KEY = "kokiko_widget_cart";
 
     const state = {
       loadedOnce: false,
       isSearching: false,
       isLoading: true,
       products: [],
+      cartItems: [],
+      cartOpen: false,
       lastQuery: "",
       apiBaseUrl: "",
       requestedPage: "search",
@@ -24,6 +27,13 @@
     const supportButton = document.getElementById("products-support-button");
     const supportLayer = document.getElementById("products-support-layer");
     const supportPopup = document.getElementById("products-support-popup");
+    const cartButton = document.getElementById("products-cart-button");
+    const cartCount = document.getElementById("products-cart-count");
+    const cartLayer = document.getElementById("products-cart-layer");
+    const cartPanel = document.getElementById("products-cart-panel");
+    const cartItems = document.getElementById("products-cart-items");
+    const cartTotal = document.getElementById("products-cart-total");
+    const cartCheckout = document.getElementById("products-cart-checkout");
 
     const normalizeText = (value) => String(value || "").trim();
     const normalizeLanguage = (value) => {
@@ -97,6 +107,28 @@
         return null;
       }
       return Math.max(1, Math.round(((price - discountPrice) / price) * 100));
+    };
+
+    const getProductPrice = (product) => {
+      if (!product || typeof product !== "object") {
+        return null;
+      }
+      const basePrice =
+        typeof product.price === "number" && product.price > 0
+          ? product.price
+          : null;
+      const discountPrice =
+        typeof product.discountPrice === "number" && product.discountPrice > 0
+          ? product.discountPrice
+          : null;
+      if (
+        basePrice !== null &&
+        discountPrice !== null &&
+        discountPrice < basePrice
+      ) {
+        return discountPrice;
+      }
+      return basePrice;
     };
 
     const resolveImageUrl = (rawUrl) => {
@@ -401,12 +433,77 @@
       };
     };
 
+    const normalizeCartQuantity = (value) => {
+      const quantity = Number(value);
+      if (!Number.isFinite(quantity)) {
+        return 1;
+      }
+      return Math.min(99, Math.max(1, Math.floor(quantity)));
+    };
+
+    const sanitizeCartItem = (item) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+      const id = normalizeText(item.id);
+      const name = normalizeText(item.name);
+      const price = Number(item.price);
+      if (!id || !name || !Number.isFinite(price) || price <= 0) {
+        return null;
+      }
+      return {
+        id,
+        name,
+        manufacturer: normalizeText(item.manufacturer),
+        price,
+        imageUrl: normalizeText(item.imageUrl) || getFallbackImage(),
+        productUrl: normalizeText(item.productUrl) || getSiteBaseUrl(),
+        quantity: normalizeCartQuantity(item.quantity),
+      };
+    };
+
+    const readStoredCart = () => {
+      try {
+        const rawCart = window.localStorage.getItem(CART_STORAGE_KEY);
+        const parsed = rawCart ? JSON.parse(rawCart) : [];
+        if (!Array.isArray(parsed)) {
+          return [];
+        }
+        return parsed.map(sanitizeCartItem).filter(Boolean);
+      } catch (_error) {
+        return [];
+      }
+    };
+
+    const writeStoredCart = () => {
+      try {
+        window.localStorage.setItem(
+          CART_STORAGE_KEY,
+          JSON.stringify(state.cartItems),
+        );
+      } catch (_error) {
+        // ignore storage write errors
+      }
+    };
+
+    const getCartCount = () =>
+      state.cartItems.reduce((total, item) => total + item.quantity, 0);
+
+    const getCartTotal = () =>
+      state.cartItems.reduce(
+        (total, item) => total + item.price * item.quantity,
+        0,
+      );
+
+    state.cartItems = readStoredCart();
+
     return {
       root,
       state,
       constants: {
         INITIAL_PAYLOAD_WAIT_MS,
         INITIAL_PAYLOAD_POLL_MS,
+        CART_STORAGE_KEY,
       },
       dom: {
         input,
@@ -418,15 +515,29 @@
         supportButton,
         supportLayer,
         supportPopup,
+        cartButton,
+        cartCount,
+        cartLayer,
+        cartPanel,
+        cartItems,
+        cartTotal,
+        cartCheckout,
       },
       ui: {
         renderProducts: () => {},
+        renderCart: () => {},
         updateCarouselControls: () => {},
+        toggleCart: (_nextState) => {},
         toggleSupportPopup: (_nextState) => {},
       },
       actions: {
         searchProducts: (_query) => Promise.resolve(),
         openSupportPopup: () => {},
+        addToCart: (_productId) => {},
+        changeCartQuantity: (_productId, _delta) => {},
+        removeFromCart: (_productId) => {},
+        openCart: () => {},
+        closeCart: () => {},
       },
       tools: {
         waitForInitialPayload: () => Promise.resolve(false),
@@ -438,6 +549,7 @@
         debugLog,
         toMoney,
         computeDiscount,
+        getProductPrice,
         resolveImageUrl,
         resolveUrl,
         getPreferredLanguage,
@@ -447,6 +559,10 @@
         setLoading,
         extractItems,
         mapProduct,
+        normalizeCartQuantity,
+        writeStoredCart,
+        getCartCount,
+        getCartTotal,
       },
     };
   };
