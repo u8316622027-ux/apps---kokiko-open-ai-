@@ -75,21 +75,41 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             name="submit_order",
             title="Submit order",
             description=(
-                "Submit a KoKiKo checkout order from the widget cart. "
-                "Returns a received status, order id, normalized items and total."
+                "Submit a live Kokiko checkout order by syncing the widget cart "
+                "to Kokiko API and calling the official order endpoint. "
+                "Returns submitted status, upstream order id, normalized items and total."
             ),
             input_schema={
                 "type": "object",
                 "properties": {
                     "customer_name": {"type": "string"},
                     "customer_phone": {"type": "string"},
+                    "email": {"type": "string"},
                     "delivery_method": {
                         "type": "string",
                         "description": "pickup or courier",
                     },
                     "city": {"type": "string"},
                     "address": {"type": "string"},
+                    "street": {"type": "string"},
+                    "building": {"type": "string"},
+                    "apartment": {"type": "string"},
+                    "entrance": {"type": "string"},
+                    "floor": {"type": "string"},
+                    "intercom_code": {"type": "string"},
+                    "region_id": {"type": "integer"},
+                    "sector_id": {"type": "integer"},
+                    "pharmacy_id": {"type": "integer"},
+                    "shop_id": {"type": "integer"},
+                    "payment_method": {
+                        "type": "string",
+                        "description": "cash, card, card-online, mia, iban",
+                    },
+                    "use_bonuses": {"type": "boolean"},
+                    "promo_code": {"type": "string"},
                     "comment": {"type": "string"},
+                    "language": {"type": "string"},
+                    "platform": {"type": "string"},
                     "items": {
                         "type": "array",
                         "items": {"type": "object"},

@@ -44,6 +44,11 @@ def test_submit_order_tool_descriptor_allows_checkout_submission() -> None:
     assert payload["annotations"]["destructiveHint"] is False
     assert payload["_meta"]["openai/toolInvocation/invoking"]
     assert payload["inputSchema"]["required"] == ["customer_name", "customer_phone", "items"]
+    assert "live Kokiko" in payload["description"]
+    assert payload["inputSchema"]["properties"]["payment_method"]["type"] == "string"
+    assert payload["inputSchema"]["properties"]["pharmacy_id"]["type"] == "integer"
+    assert payload["inputSchema"]["properties"]["region_id"]["type"] == "integer"
+    assert payload["inputSchema"]["properties"]["sector_id"]["type"] == "integer"
 
 
 def test_cart_tools_are_registered_for_text_control() -> None:

@@ -101,8 +101,8 @@ test("products widget submits checkout form through order tool", async ({
         window.__KOKIKO_ORDER_CALLS__.push({ name, args });
         return {
           structuredContent: {
-            status: "received",
-            order_id: "KOKIKO-TEST",
+            status: "submitted",
+            order_id: "770001",
           },
         };
       },
@@ -124,7 +124,7 @@ test("products widget submits checkout form through order tool", async ({
   await page.locator("#products-order-submit").click();
 
   await expect(page.locator("#products-checkout-status")).toContainText(
-    "KOKIKO-TEST",
+    "770001",
   );
   await expect(page.locator("#products-cart-button")).toContainText("0");
 
