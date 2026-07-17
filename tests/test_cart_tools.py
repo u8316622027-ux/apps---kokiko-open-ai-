@@ -40,6 +40,23 @@ def test_add_to_cart_adds_new_item_and_increments_existing() -> None:
     assert second["cart"]["items"][0]["quantity"] == 3
 
 
+def test_add_to_cart_uses_top_level_quantity() -> None:
+    payload = add_to_cart(
+        {
+            "product": {
+                "id": "cream-1",
+                "name": "Face cream",
+                "price": 99,
+            },
+            "quantity": 2,
+        }
+    )
+
+    assert payload["cart"]["count"] == 2
+    assert payload["cart"]["total"] == 198.0
+    assert payload["cart"]["items"][0]["quantity"] == 2
+
+
 def test_update_cart_item_sets_quantity() -> None:
     payload = update_cart_item(
         {

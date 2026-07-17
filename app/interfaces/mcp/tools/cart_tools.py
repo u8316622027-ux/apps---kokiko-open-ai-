@@ -9,9 +9,16 @@ def add_to_cart(arguments: dict[str, Any]) -> dict[str, Any]:
     """Add a product to a cart payload and return the updated cart."""
 
     cart_items = _normalize_cart(arguments.get("cart"))
-    product = _normalize_product(arguments.get("product") or arguments)
+    raw_product = arguments.get("product") or arguments
+    product = _normalize_product(raw_product)
     if product is None:
         raise ValueError("product is required")
+    if (
+        isinstance(raw_product, dict)
+        and "quantity" not in raw_product
+        and arguments.get("quantity") is not None
+    ):
+        product["quantity"] = _normalize_quantity(arguments.get("quantity"))
 
     existing = _find_item(cart_items, product["id"])
     if existing is None:
