@@ -18,8 +18,22 @@
       checkoutCity,
       checkoutAddress,
       checkoutComment,
+      checkoutStreet,
+      checkoutBuilding,
+      checkoutApartment,
+      checkoutEntrance,
+      checkoutFloor,
+      checkoutIntercom,
+      checkoutEmail,
+      checkoutRegion,
+      checkoutSector,
+      checkoutPharmacy,
+      checkoutDeliveryWindows,
+      checkoutReview,
+      checkoutConsent,
       checkoutStatus,
       orderSubmit,
+      checkoutBack,
     } = dom;
     const {
       normalizeText,
@@ -91,12 +105,102 @@
       renderProducts();
     };
 
+    const getCheckoutCopy = () => ({
+      addressStep: "address",
+      deliveryStep: "delivery",
+      reviewStep: "review",
+      missingConsent: "Подтвердите согласие с условиями.",
+      missingDelivery: "Выберите способ доставки.",
+      missingStreet: "Укажите улицу и номер дома.",
+      next: "Продолжить",
+      submit: "Оформить",
+    });
+
+    const normalizeCartToolItem = (item) => ({
+      id: item.id,
+      name: item.name,
+      manufacturer: item.manufacturer,
+      price: item.price,
+      quantity: item.quantity,
+      image_url: item.imageUrl,
+      product_url: item.productUrl,
+    });
+
+    const getCartPayload = () => ({
+      token: state.cartToken,
+      items: state.cartItems.map(normalizeCartToolItem),
+    });
+
+    const applyCartToolResult = (toolResult) => {
+      const payload =
+        (toolResult &&
+          typeof toolResult === "object" &&
+          toolResult.structuredContent) ||
+        toolResult ||
+        {};
+      const cart =
+        payload.cart && typeof payload.cart === "object" ? payload.cart : {};
+      if (normalizeText(cart.token)) {
+        state.cartToken = normalizeText(cart.token);
+      }
+      if (!Array.isArray(cart.items)) {
+        return;
+      }
+      state.cartItems = cart.items
+        .map((item) => {
+          if (!item || typeof item !== "object") {
+            return null;
+          }
+          const id = normalizeText(item.id || item.product_id);
+          const name = normalizeText(item.name);
+          if (!id || !name) {
+            return null;
+          }
+          const quantity = Math.max(
+            1,
+            Math.min(99, Number(item.quantity) || 1),
+          );
+          const price = Number(item.price) || 0;
+          return {
+            id,
+            name,
+            manufacturer: normalizeText(item.manufacturer),
+            price,
+            imageUrl: normalizeText(item.image_url || item.imageUrl),
+            productUrl: normalizeText(item.product_url || item.productUrl),
+            quantity,
+          };
+        })
+        .filter(Boolean);
+      persistAndRenderCart();
+    };
+
+    const callCartTool = async (name, args) => {
+      if (typeof window.openai?.callTool !== "function") {
+        return;
+      }
+      try {
+        const toolResult = await window.openai.callTool(name, args);
+        applyCartToolResult(toolResult);
+      } catch (error) {
+        debugLog("cart_tool_error", {
+          tool: name,
+          message: String(error?.message ? error.message : error),
+          level: "warn",
+        });
+      }
+    };
+
     const setCartOpen = (nextState) => {
       if (!(cartLayer instanceof HTMLElement)) {
         return;
       }
       const isOpen = Boolean(nextState);
       state.cartOpen = isOpen;
+      if (!isOpen) {
+        state.checkoutOpen = false;
+        state.checkoutStep = getCheckoutCopy().deliveryStep;
+      }
       cartLayer.hidden = !isOpen;
       cartButton?.setAttribute("aria-expanded", String(isOpen));
       if (isOpen) {
@@ -117,9 +221,11 @@
       }
       if (isOpen) {
         state.orderSubmitted = false;
+        state.checkoutStep = getCheckoutCopy().deliveryStep;
         setCheckoutStatus("", "");
       } else {
         state.orderSubmitted = false;
+        state.checkoutStep = getCheckoutCopy().deliveryStep;
       }
       state.checkoutOpen = isOpen;
       renderCheckout();
@@ -132,10 +238,60 @@
       }
     };
 
+    const setCheckoutStep = (step) => {
+      const copy = getCheckoutCopy();
+      const normalized = normalizeText(step);
+      if (
+        ![copy.deliveryStep, copy.addressStep, copy.reviewStep].includes(
+          normalized,
+        )
+      ) {
+        return;
+      }
+      state.checkoutStep = normalized;
+      setCheckoutStatus("", "");
+      renderCheckout();
+    };
+
+    const nextCheckoutStep = () => {
+      const copy = getCheckoutCopy();
+      const payload = buildOrderPayload();
+      if (state.checkoutStep === copy.deliveryStep) {
+        setCheckoutStep(copy.addressStep);
+        return;
+      }
+      if (state.checkoutStep === copy.addressStep) {
+        const validationError = validateOrderPayload(payload, {
+          includeConsent: false,
+        });
+        if (validationError) {
+          setCheckoutStatus(validationError, "error");
+          return;
+        }
+        setCheckoutStep(copy.reviewStep);
+      }
+    };
+
+    const previousCheckoutStep = () => {
+      const copy = getCheckoutCopy();
+      if (state.checkoutStep === copy.reviewStep) {
+        setCheckoutStep(copy.addressStep);
+        return;
+      }
+      if (state.checkoutStep === copy.addressStep) {
+        setCheckoutStep(copy.deliveryStep);
+        return;
+      }
+      setCheckoutOpen(false);
+    };
+
     const getDeliveryMethod = () => {
-      const selected = document.querySelector(
-        'input[name="products-delivery-method"]:checked',
-      );
+      const selected =
+        checkoutForm instanceof HTMLElement
+          ? checkoutForm.querySelector(
+              'input[name="products-delivery-method"]:checked',
+            )
+          : null;
       if (
         selected instanceof HTMLInputElement &&
         selected.value === "courier"
@@ -156,21 +312,77 @@
     const getCheckoutValue = (element) => {
       if (
         element instanceof HTMLInputElement ||
-        element instanceof HTMLTextAreaElement
+        element instanceof HTMLTextAreaElement ||
+        element instanceof HTMLSelectElement
       ) {
         return normalizeText(element.value);
       }
       return "";
     };
 
+    const getSelectedPaymentMethod = () => {
+      const selected =
+        checkoutForm instanceof HTMLElement
+          ? checkoutForm.querySelector(
+              'input[name="products-payment-method"]:checked',
+            )
+          : null;
+      if (selected instanceof HTMLInputElement) {
+        return normalizeText(selected.value) || "cash";
+      }
+      return "cash";
+    };
+
+    const getSelectedDeliveryWindow = () => {
+      const selected =
+        checkoutForm instanceof HTMLElement
+          ? checkoutForm.querySelector(
+              'input[name="products-delivery-window"]:checked',
+            )
+          : null;
+      if (!(selected instanceof HTMLInputElement) || !selected.value) {
+        return null;
+      }
+      const [date, time] = selected.value.split("|");
+      return {
+        date: normalizeText(date),
+        time: normalizeText(time),
+      };
+    };
+
+    const composeAddress = () => {
+      const explicitAddress = getCheckoutValue(checkoutAddress);
+      if (explicitAddress) {
+        return explicitAddress;
+      }
+      const street = getCheckoutValue(checkoutStreet);
+      const building = getCheckoutValue(checkoutBuilding);
+      return [street, building].filter(Boolean).join(", ");
+    };
+
     const buildOrderPayload = () => ({
+      cart_token: state.cartToken,
       customer_name: getCheckoutValue(checkoutName),
       customer_phone: getCheckoutValue(checkoutPhone),
       delivery_method: getDeliveryMethod(),
       city: getCheckoutValue(checkoutCity) || "Chisinau",
-      address: getCheckoutValue(checkoutAddress),
+      address: composeAddress(),
+      street: getCheckoutValue(checkoutStreet),
+      building: getCheckoutValue(checkoutBuilding),
+      apartment: getCheckoutValue(checkoutApartment),
+      entrance: getCheckoutValue(checkoutEntrance),
+      floor: getCheckoutValue(checkoutFloor),
+      intercom_code: getCheckoutValue(checkoutIntercom),
+      email: getCheckoutValue(checkoutEmail),
+      region_id: Number(getCheckoutValue(checkoutRegion)) || 2,
+      sector_id: Number(getCheckoutValue(checkoutSector)) || 1550,
+      pharmacy_id: Number(getCheckoutValue(checkoutPharmacy)) || 36,
+      payment_method: getSelectedPaymentMethod(),
+      delivery_window:
+        getDeliveryMethod() === "courier" ? getSelectedDeliveryWindow() : null,
       comment: getCheckoutValue(checkoutComment),
       language: getActiveLanguage(),
+      platform: "web",
       total: getCartTotal(),
       items: state.cartItems.map((item) => ({
         id: item.id,
@@ -181,16 +393,27 @@
       })),
     });
 
-    const validateOrderPayload = (payload) => {
+    const validateOrderPayload = (payload, options = {}) => {
       const copy = getCartCopy();
+      const checkoutCopy = getCheckoutCopy();
       if (!payload.items.length) {
         return copy.errorItems;
       }
       if (!payload.customer_name || !payload.customer_phone) {
         return copy.errorContact;
       }
-      if (payload.delivery_method === "courier" && !payload.address) {
-        return copy.errorAddress;
+      if (
+        payload.delivery_method === "courier" &&
+        (!payload.street || !payload.building)
+      ) {
+        return checkoutCopy.missingStreet || copy.errorAddress;
+      }
+      if (
+        options.includeConsent !== false &&
+        checkoutConsent instanceof HTMLInputElement &&
+        !checkoutConsent.checked
+      ) {
+        return checkoutCopy.missingConsent;
       }
       return "";
     };
@@ -227,6 +450,7 @@
           {};
         const orderId = normalizeText(structuredContent.order_id);
         state.cartItems = [];
+        state.cartToken = "";
         state.orderSubmitted = true;
         state.checkoutOpen = true;
         writeStoredCart();
@@ -258,6 +482,16 @@
         debugLog("cart_add_unavailable", { productId });
         return;
       }
+      const previousCart = getCartPayload();
+      const productPayload = {
+        id: product.id,
+        name: product.name,
+        manufacturer: product.manufacturer,
+        price,
+        image_url: product.imageUrl,
+        product_url: product.productUrl,
+        quantity: 1,
+      };
       const existing = findCartItem(product.id);
       if (existing) {
         existing.quantity = Math.min(99, existing.quantity + 1);
@@ -275,6 +509,12 @@
       state.orderSubmitted = false;
       debugLog("cart_add", { productId: product.id });
       persistAndRenderCart();
+      void callCartTool("add_to_cart", {
+        cart: previousCart,
+        product: productPayload,
+        quantity: 1,
+        language: getActiveLanguage(),
+      });
     };
 
     const changeCartQuantity = (productId, delta) => {
@@ -292,6 +532,12 @@
         quantity: nextQuantity,
       });
       persistAndRenderCart();
+      void callCartTool("update_cart_item", {
+        cart: getCartPayload(),
+        product_id: cartItem.id,
+        quantity: nextQuantity,
+        language: getActiveLanguage(),
+      });
     };
 
     const removeFromCart = (productId) => {
@@ -301,6 +547,11 @@
       );
       debugLog("cart_remove", { productId: normalizedProductId });
       persistAndRenderCart();
+      void callCartTool("remove_from_cart", {
+        cart: getCartPayload(),
+        product_id: normalizedProductId,
+        language: getActiveLanguage(),
+      });
     };
 
     const renderCart = () => {
@@ -319,6 +570,12 @@
       }
       if (cartCheckout instanceof HTMLButtonElement) {
         cartCheckout.disabled = count < 1;
+      }
+      if (cartPanel instanceof HTMLElement) {
+        cartPanel.classList.toggle("is-checkout", state.checkoutOpen);
+      }
+      if (cartItems instanceof HTMLElement) {
+        cartItems.hidden = state.checkoutOpen;
       }
       if (cartTotal instanceof HTMLElement) {
         cartTotal.textContent = toMoney(total);
@@ -387,7 +644,183 @@
       renderCheckout();
     };
 
+    const formatWindowDate = (date) =>
+      `${String(date.getDate()).padStart(2, "0")}.${String(
+        date.getMonth() + 1,
+      ).padStart(2, "0")}.${date.getFullYear()}`;
+
+    const renderDeliveryWindows = () => {
+      if (!(checkoutDeliveryWindows instanceof HTMLElement)) {
+        return;
+      }
+      if (checkoutDeliveryWindows.childElementCount > 0) {
+        return;
+      }
+      const slots = [
+        ["20:00 - 22:30", "22:00 - 23:30"],
+        ["12:00 - 16:00", "17:00 - 20:00", "20:00 - 22:00"],
+        ["12:00 - 16:00", "17:00 - 20:00", "20:00 - 22:00"],
+        ["10:00 - 14:00", "14:00 - 18:00", "17:00 - 20:00"],
+      ];
+      const today = new Date();
+      checkoutDeliveryWindows.innerHTML = slots
+        .map((daySlots, dayIndex) => {
+          const date = new Date(today);
+          date.setDate(today.getDate() + dayIndex);
+          const labelDate = formatWindowDate(date);
+          const options = daySlots
+            .map((slot, slotIndex) => {
+              const checked =
+                dayIndex === 0 && slotIndex === 0 ? "checked" : "";
+              const safeSlot = escapeHtml(slot);
+              return `
+                <label>
+                  <input type="radio" name="products-delivery-window" value="${escapeHtml(labelDate)}|${safeSlot}" ${checked} />
+                  <span>${safeSlot}</span>
+                </label>
+              `;
+            })
+            .join("");
+          return `
+            <div class="products-delivery-window-day">
+              <strong>${escapeHtml(labelDate)}</strong>
+              ${options}
+            </div>
+          `;
+        })
+        .join("");
+    };
+
+    const renderCheckoutReview = () => {
+      if (!(checkoutReview instanceof HTMLElement)) {
+        return;
+      }
+      const payload = buildOrderPayload();
+      const deliveryLabel =
+        payload.delivery_method === "courier"
+          ? "Курьерская доставка"
+          : "Самовывоз";
+      const addressLabel =
+        payload.delivery_method === "courier"
+          ? payload.address || "-"
+          : "Магазин косметики КоКиКо, ул. А. Руссо, 1";
+      const deliveryWindow = payload.delivery_window
+        ? `${payload.delivery_window.date} • ${payload.delivery_window.time}`
+        : payload.delivery_method === "pickup"
+          ? "Самовывоз из магазина"
+          : "-";
+      const itemsHtml = state.cartItems
+        .map((item) => {
+          const lineTotal = toMoney(item.price * item.quantity);
+          return `
+            <li>
+              <span>${escapeHtml(item.name)}</span>
+              <strong>${toMoney(item.price)} x ${item.quantity} = ${lineTotal}</strong>
+            </li>
+          `;
+        })
+        .join("");
+      checkoutReview.innerHTML = `
+        <div class="products-checkout-review-card">
+          <h4>Список товаров</h4>
+          <ul>${itemsHtml}</ul>
+          <p><span>Стоимость товаров:</span><strong>${toMoney(getCartTotal())}</strong></p>
+          <p><span>Итого к оплате:</span><strong>${toMoney(getCartTotal())}</strong></p>
+        </div>
+        <div class="products-checkout-review-card">
+          <h4>Данные заказа</h4>
+          <p><span>Имя:</span><strong>${escapeHtml(payload.customer_name || "-")}</strong></p>
+          <p><span>Телефон:</span><strong>${escapeHtml(payload.customer_phone || "-")}</strong></p>
+          <p><span>Тип доставки:</span><strong>${escapeHtml(deliveryLabel)}</strong></p>
+          <p><span>Адрес доставки:</span><strong>${escapeHtml(addressLabel)}</strong></p>
+          <p><span>Дата доставки:</span><strong>${escapeHtml(deliveryWindow)}</strong></p>
+          <p><span>Комментарий:</span><strong>${escapeHtml(payload.comment || "-")}</strong></p>
+        </div>
+      `;
+    };
+
+    const renderCheckoutFlow = () => {
+      if (!(checkoutForm instanceof HTMLElement)) {
+        return;
+      }
+      const shouldShowCheckout = state.checkoutOpen || state.orderSubmitted;
+      checkoutForm.hidden = !shouldShowCheckout;
+      if (cartPanel instanceof HTMLElement) {
+        cartPanel.classList.toggle("is-checkout", shouldShowCheckout);
+      }
+      if (cartItems instanceof HTMLElement) {
+        cartItems.hidden = shouldShowCheckout;
+      }
+      if (cartCheckout instanceof HTMLButtonElement) {
+        cartCheckout.disabled =
+          state.isSubmittingOrder ||
+          (!state.cartItems.length && !state.orderSubmitted);
+      }
+      renderDeliveryWindows();
+
+      checkoutForm.dataset.deliveryMethod = getDeliveryMethod();
+      const steps = checkoutForm.querySelectorAll("[data-checkout-step]");
+      for (const step of steps) {
+        if (step instanceof HTMLElement) {
+          step.hidden = step.dataset.checkoutStep !== state.checkoutStep;
+        }
+      }
+      const indicators = checkoutForm.querySelectorAll("[data-step-indicator]");
+      for (const indicator of indicators) {
+        if (indicator instanceof HTMLElement) {
+          indicator.dataset.state =
+            indicator.dataset.stepIndicator === state.checkoutStep
+              ? "active"
+              : "";
+        }
+      }
+      if (state.checkoutStep === getCheckoutCopy().reviewStep) {
+        renderCheckoutReview();
+      }
+
+      const nextButton = checkoutForm.querySelector(
+        '[data-checkout-action="next"]',
+      );
+      if (nextButton instanceof HTMLButtonElement) {
+        nextButton.hidden = state.checkoutStep === getCheckoutCopy().reviewStep;
+        nextButton.disabled = state.isSubmittingOrder;
+        nextButton.textContent = getCheckoutCopy().next;
+      }
+      if (checkoutBack instanceof HTMLButtonElement) {
+        checkoutBack.disabled = state.isSubmittingOrder;
+      }
+      if (orderSubmit instanceof HTMLButtonElement) {
+        orderSubmit.hidden =
+          state.checkoutStep !== getCheckoutCopy().reviewStep;
+        orderSubmit.disabled =
+          state.isSubmittingOrder || !state.cartItems.length;
+        orderSubmit.textContent = state.isSubmittingOrder
+          ? getCartCopy().sending
+          : getCheckoutCopy().submit;
+      }
+      const formControls = checkoutForm.querySelectorAll(
+        "input, textarea, select, button",
+      );
+      for (const control of formControls) {
+        if (
+          control instanceof HTMLInputElement ||
+          control instanceof HTMLTextAreaElement ||
+          control instanceof HTMLSelectElement ||
+          control instanceof HTMLButtonElement
+        ) {
+          control.disabled =
+            state.isSubmittingOrder ||
+            (state.orderSubmitted &&
+              control.id !== "products-checkout-flow-back");
+        }
+      }
+    };
+
     const renderCheckout = () => {
+      renderCheckoutFlow();
+      if (state) {
+        return;
+      }
       if (!(checkoutForm instanceof HTMLElement)) {
         return;
       }
@@ -609,6 +1042,9 @@
     ctx.actions.closeCart = () => setCartOpen(false);
     ctx.actions.openCheckout = () => setCheckoutOpen(true);
     ctx.actions.closeCheckout = () => setCheckoutOpen(false);
+    ctx.actions.nextCheckoutStep = nextCheckoutStep;
+    ctx.actions.previousCheckoutStep = previousCheckoutStep;
+    ctx.actions.setCheckoutStep = setCheckoutStep;
     ctx.actions.submitOrder = submitOrder;
   };
 

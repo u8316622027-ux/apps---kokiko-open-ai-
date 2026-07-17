@@ -232,6 +232,205 @@
                 </div>
               </form>
 
+              <form class="products-checkout-form products-checkout-flow" id="products-checkout-flow" hidden novalidate>
+                <input id="products-checkout-flow-city" name="city" type="hidden" value="Chisinau" />
+                <input id="products-checkout-flow-address" name="address" type="hidden" />
+
+                <div class="products-checkout-heading">
+                  <p class="products-cart-kicker">KoKiKo</p>
+                  <h3 class="products-checkout-title">Оформление заказа</h3>
+                </div>
+
+                <nav class="products-checkout-steps" aria-label="Checkout steps">
+                  <span data-step-indicator="delivery">Доставка</span>
+                  <span data-step-indicator="address">Адрес и время</span>
+                  <span data-step-indicator="review">Обзор и оплата</span>
+                </nav>
+
+                <section class="products-checkout-step" data-checkout-step="delivery">
+                  <fieldset class="products-checkout-delivery">
+                    <legend>Выберите способ доставки:</legend>
+                    <label>
+                      <input
+                        type="radio"
+                        name="products-delivery-method"
+                        value="courier"
+                      />
+                      <span>Курьерская доставка</span>
+                    </label>
+                    <label>
+                      <input
+                        type="radio"
+                        name="products-delivery-method"
+                        value="pickup"
+                        checked
+                      />
+                      <span>Самовывоз</span>
+                    </label>
+                  </fieldset>
+                </section>
+
+                <section class="products-checkout-step" data-checkout-step="address" hidden>
+                  <div class="products-checkout-grid">
+                    <label class="products-checkout-field">
+                      <span>Имя*</span>
+                      <input
+                        id="products-checkout-flow-name"
+                        name="customer_name"
+                        type="text"
+                        autocomplete="name"
+                        required
+                      />
+                    </label>
+
+                    <label class="products-checkout-field">
+                      <span>Номер телефона*</span>
+                      <input
+                        id="products-checkout-flow-phone"
+                        name="customer_phone"
+                        type="tel"
+                        inputmode="tel"
+                        autocomplete="tel"
+                        placeholder="37379703000"
+                        required
+                      />
+                    </label>
+
+                    <label class="products-checkout-field">
+                      <span>Регион*</span>
+                      <select id="products-checkout-flow-region" name="region_id">
+                        <option value="2">г. Кишинёв</option>
+                      </select>
+                    </label>
+
+                    <label class="products-checkout-field">
+                      <span>Сектор*</span>
+                      <select id="products-checkout-flow-sector" name="sector_id">
+                        <option value="1550">г. Кишинёв</option>
+                      </select>
+                    </label>
+
+                    <label class="products-checkout-field products-courier-only products-checkout-field--wide">
+                      <span>Улица*</span>
+                      <input
+                        id="products-checkout-flow-street"
+                        name="street"
+                        type="text"
+                        autocomplete="street-address"
+                      />
+                    </label>
+
+                    <label class="products-checkout-field products-courier-only">
+                      <span>№ дома*</span>
+                      <input id="products-checkout-flow-building" name="building" type="text" />
+                    </label>
+
+                    <label class="products-checkout-field products-courier-only">
+                      <span>Квартира</span>
+                      <input id="products-checkout-flow-apartment" name="apartment" type="text" />
+                    </label>
+
+                    <label class="products-checkout-field products-courier-only">
+                      <span>Подъезд</span>
+                      <input id="products-checkout-flow-entrance" name="entrance" type="text" />
+                    </label>
+
+                    <label class="products-checkout-field products-courier-only">
+                      <span>Этаж</span>
+                      <input id="products-checkout-flow-floor" name="floor" type="text" />
+                    </label>
+
+                    <label class="products-checkout-field products-courier-only">
+                      <span>Код домофона</span>
+                      <input id="products-checkout-flow-intercom" name="intercom_code" type="text" />
+                    </label>
+
+                    <label class="products-checkout-field products-pickup-only products-checkout-field--wide">
+                      <span>Аптека</span>
+                      <select id="products-checkout-flow-pharmacy" name="pharmacy_id">
+                        <option value="36">Магазин косметики КоКиКо, ул. А. Руссо, 1</option>
+                      </select>
+                    </label>
+
+                    <label class="products-checkout-field products-checkout-field--wide">
+                      <span>Email</span>
+                      <input
+                        id="products-checkout-flow-email"
+                        name="email"
+                        type="email"
+                        autocomplete="email"
+                      />
+                    </label>
+                  </div>
+
+                  <fieldset class="products-delivery-window products-courier-only">
+                    <legend>Выберите время доставки:</legend>
+                    <div id="products-checkout-flow-delivery-windows"></div>
+                  </fieldset>
+
+                  <label class="products-checkout-field products-checkout-field--wide">
+                    <span>Комментарий</span>
+                    <textarea
+                      id="products-checkout-flow-comment"
+                      name="comment"
+                      rows="2"
+                    ></textarea>
+                  </label>
+                </section>
+
+                <section class="products-checkout-step" data-checkout-step="review" hidden>
+                  <div class="products-checkout-review" id="products-checkout-flow-review"></div>
+
+                  <fieldset class="products-payment-methods">
+                    <legend>Выберите способ оплаты:</legend>
+                    <label>
+                      <input type="radio" name="products-payment-method" value="cash" checked />
+                      <span>Наличными</span>
+                    </label>
+                    <label>
+                      <input type="radio" name="products-payment-method" value="card" />
+                      <span>Картой при получении</span>
+                    </label>
+                    <label>
+                      <input type="radio" name="products-payment-method" value="maib" />
+                      <span>Картой онлайн</span>
+                    </label>
+                    <label>
+                      <input type="radio" name="products-payment-method" value="mia" />
+                      <span>Онлайн по QR коду</span>
+                    </label>
+                    <label>
+                      <input type="radio" name="products-payment-method" value="cashless_individual" />
+                      <span>Перечислением</span>
+                    </label>
+                  </fieldset>
+
+                  <label class="products-checkout-consent">
+                    <input id="products-checkout-flow-consent" type="checkbox" required />
+                    <span>Согласен с пользовательским соглашением / политикой конфиденциальности</span>
+                  </label>
+                </section>
+
+                <div
+                  class="products-checkout-status"
+                  id="products-checkout-flow-status"
+                  role="status"
+                  aria-live="polite"
+                ></div>
+
+                <div class="products-checkout-actions">
+                  <button class="products-checkout-back" id="products-checkout-flow-back" type="button" data-checkout-action="back">
+                    Назад
+                  </button>
+                  <button class="products-checkout-next" type="button" data-checkout-action="next">
+                    Продолжить
+                  </button>
+                  <button class="products-order-submit" id="products-checkout-flow-submit" type="submit" hidden>
+                    Оформить
+                  </button>
+                </div>
+              </form>
+
               <footer class="products-cart-footer">
                 <div class="products-cart-total-row">
                   <span>Итого</span>

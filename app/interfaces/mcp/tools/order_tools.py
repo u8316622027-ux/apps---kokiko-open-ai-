@@ -27,6 +27,8 @@ class KokikoOrderClientProtocol(Protocol):
         self, token: str, items: list[dict[str, int]], *, language: str
     ) -> dict[str, Any]: ...
 
+    def clear_cart(self, token: str, *, language: str) -> dict[str, Any]: ...
+
     def fetch_default_pickup_shop_id(self, *, language: str) -> int: ...
 
     def send_order(
@@ -65,6 +67,15 @@ class KokikoOrderClient:
             "POST",
             "/cart/update",
             payload={"items": items},
+            token=token,
+            language=language,
+        )
+
+    def clear_cart(self, token: str, *, language: str) -> dict[str, Any]:
+        return self._request_json(
+            "POST",
+            "/cart/clear",
+            payload={},
             token=token,
             language=language,
         )
@@ -179,7 +190,7 @@ def submit_order(
     platform = _normalize_text(arguments.get("platform")) or KOKIKO_DEFAULT_PLATFORM
     effective_client = client or KokikoOrderClient()
 
-    cart_token = effective_client.create_cart(language=language)
+    cart_token = _extract_cart_token(arguments) or effective_client.create_cart(language=language)
     effective_client.update_cart(
         cart_token,
         [{"product_id": int(item["id"]), "quantity": int(item["quantity"])} for item in items],
@@ -256,6 +267,27 @@ def _normalize_order_items(raw_items: Any) -> list[dict[str, Any]]:
             }
         )
     return items
+
+
+def _extract_cart_token(arguments: dict[str, Any]) -> str:
+    direct_token = _normalize_text(
+        arguments.get("cart_token")
+        or arguments.get("cartToken")
+        or arguments.get("access_token")
+        or arguments.get("accessToken")
+    )
+    if direct_token:
+        return direct_token
+    cart = arguments.get("cart")
+    if isinstance(cart, dict):
+        return _normalize_text(
+            cart.get("token")
+            or cart.get("cart_token")
+            or cart.get("cartToken")
+            or cart.get("access_token")
+            or cart.get("accessToken")
+        )
+    return ""
 
 
 def _build_send_order_payload(

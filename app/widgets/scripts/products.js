@@ -86,7 +86,30 @@
 
   checkoutBack?.addEventListener("click", (event) => {
     event.preventDefault();
-    actions.closeCheckout();
+    event.stopPropagation();
+    actions.previousCheckoutStep();
+  });
+
+  checkoutForm?.addEventListener("click", (event) => {
+    const target =
+      event.target instanceof Element
+        ? event.target.closest("[data-checkout-action]")
+        : null;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    event.preventDefault();
+    if (target.dataset.checkoutAction === "next") {
+      actions.nextCheckoutStep();
+      return;
+    }
+    if (target.dataset.checkoutAction === "back") {
+      actions.previousCheckoutStep();
+    }
+  });
+
+  checkoutForm?.addEventListener("change", () => {
+    ui.renderCheckout();
   });
 
   checkoutForm?.addEventListener("submit", (event) => {

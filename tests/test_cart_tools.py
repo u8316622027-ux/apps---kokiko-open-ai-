@@ -10,6 +10,25 @@ from app.interfaces.mcp.tools.cart_tools import (
 )
 
 
+class FakeCartClient:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, object]] = []
+
+    def create_cart(self, *, language: str) -> str:
+        self.calls.append(("create_cart", language))
+        return "cart-token-123"
+
+    def update_cart(
+        self, token: str, items: list[dict[str, int]], *, language: str
+    ) -> dict[str, object]:
+        self.calls.append(("update_cart", {"token": token, "items": items, "language": language}))
+        return {"items": items}
+
+    def clear_cart(self, token: str, *, language: str) -> dict[str, object]:
+        self.calls.append(("clear_cart", {"token": token, "language": language}))
+        return {}
+
+
 def test_add_to_cart_adds_new_item_and_increments_existing() -> None:
     first = add_to_cart(
         {
@@ -57,6 +76,37 @@ def test_add_to_cart_uses_top_level_quantity() -> None:
     assert payload["cart"]["items"][0]["quantity"] == 2
 
 
+def test_add_to_cart_syncs_numeric_products_with_kokiko_cart() -> None:
+    client = FakeCartClient()
+
+    payload = add_to_cart(
+        {
+            "product": {
+                "id": "26078",
+                "name": "Shampoo",
+                "price": 57.27,
+                "quantity": 2,
+            },
+            "language": "ru",
+        },
+        client=client,
+    )
+
+    assert payload["cart"]["token"] == "cart-token-123"
+    assert payload["cart"]["synced"] is True
+    assert client.calls == [
+        ("create_cart", "ru"),
+        (
+            "update_cart",
+            {
+                "token": "cart-token-123",
+                "items": [{"product_id": 26078, "quantity": 2}],
+                "language": "ru",
+            },
+        ),
+    ]
+
+
 def test_update_cart_item_sets_quantity() -> None:
     payload = update_cart_item(
         {
@@ -72,6 +122,36 @@ def test_update_cart_item_sets_quantity() -> None:
     assert payload["cart"]["items"][0]["quantity"] == 4
 
 
+def test_update_cart_item_reuses_existing_kokiko_cart_token() -> None:
+    client = FakeCartClient()
+
+    payload = update_cart_item(
+        {
+            "cart": {
+                "token": "existing-token",
+                "items": [{"id": "26078", "name": "Shampoo", "price": 57.27, "quantity": 1}],
+            },
+            "product_id": "26078",
+            "quantity": 4,
+            "language": "ru",
+        },
+        client=client,
+    )
+
+    assert payload["cart"]["token"] == "existing-token"
+    assert payload["cart"]["synced"] is True
+    assert client.calls == [
+        (
+            "update_cart",
+            {
+                "token": "existing-token",
+                "items": [{"product_id": 26078, "quantity": 4}],
+                "language": "ru",
+            },
+        )
+    ]
+
+
 def test_remove_from_cart_removes_item() -> None:
     payload = remove_from_cart(
         {
@@ -84,6 +164,27 @@ def test_remove_from_cart_removes_item() -> None:
 
     assert payload["cart"]["count"] == 0
     assert payload["cart"]["items"] == []
+
+
+def test_remove_from_cart_clears_live_kokiko_cart_when_empty() -> None:
+    client = FakeCartClient()
+
+    payload = remove_from_cart(
+        {
+            "cart": {
+                "token": "existing-token",
+                "items": [{"id": "26078", "name": "Shampoo", "price": 57.27, "quantity": 1}],
+            },
+            "product_id": "26078",
+            "language": "ru",
+        },
+        client=client,
+    )
+
+    assert payload["cart"]["count"] == 0
+    assert payload["cart"]["token"] == "existing-token"
+    assert payload["cart"]["synced"] is True
+    assert client.calls == [("clear_cart", {"token": "existing-token", "language": "ru"})]
 
 
 def test_check_cart_returns_summary() -> None:

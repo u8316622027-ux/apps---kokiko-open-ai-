@@ -165,6 +165,33 @@ def test_submit_order_uses_kokiko_pickup_shop_by_default() -> None:
     }
 
 
+def test_submit_order_reuses_existing_kokiko_cart_token() -> None:
+    client = FakeKokikoOrderClient()
+
+    payload = submit_order(
+        {
+            "cart_token": "existing-token",
+            "customer_name": "Ana Popescu",
+            "customer_phone": "+37379802000",
+            "delivery_method": "pickup",
+            "items": [{"id": "123", "name": "Face cream", "price": 99, "quantity": 1}],
+        },
+        client=client,
+    )
+
+    assert payload["status"] == "submitted"
+    assert client.calls[0] == (
+        "update_cart",
+        {
+            "token": "existing-token",
+            "items": [{"product_id": 123, "quantity": 1}],
+            "language": "ru",
+        },
+    )
+    assert client.calls[-1][0] == "send_order"
+    assert client.calls[-1][1]["token"] == "existing-token"
+
+
 def test_kokiko_order_client_uses_site_cart_and_order_endpoints(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

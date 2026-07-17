@@ -98,6 +98,18 @@
       if (!hasCartPayload(payload)) {
         return false;
       }
+      const cartNode =
+        payload.cart && typeof payload.cart === "object" ? payload.cart : {};
+      const cartToken = normalizeText(
+        cartNode.token ||
+          cartNode.cart_token ||
+          cartNode.cartToken ||
+          cartNode.access_token ||
+          cartNode.accessToken,
+      );
+      if (cartToken) {
+        state.cartToken = cartToken;
+      }
       state.cartItems = extractCartItems(payload)
         .map(mapCartItem)
         .filter(Boolean);

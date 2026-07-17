@@ -13,6 +13,8 @@
       cartItems: [],
       cartOpen: false,
       checkoutOpen: false,
+      checkoutStep: "delivery",
+      cartToken: "",
       isSubmittingOrder: false,
       orderSubmitted: false,
       lastQuery: "",
@@ -37,19 +39,64 @@
     const cartItems = document.getElementById("products-cart-items");
     const cartTotal = document.getElementById("products-cart-total");
     const cartCheckout = document.getElementById("products-cart-checkout");
-    const checkoutForm = document.getElementById("products-checkout-form");
-    const checkoutName = document.getElementById("products-checkout-name");
-    const checkoutPhone = document.getElementById("products-checkout-phone");
-    const checkoutCity = document.getElementById("products-checkout-city");
+    const checkoutForm = document.getElementById("products-checkout-flow");
+    const checkoutName = document.getElementById("products-checkout-flow-name");
+    const checkoutPhone = document.getElementById(
+      "products-checkout-flow-phone",
+    );
+    const checkoutCity = document.getElementById("products-checkout-flow-city");
     const checkoutAddress = document.getElementById(
-      "products-checkout-address",
+      "products-checkout-flow-address",
     );
     const checkoutComment = document.getElementById(
-      "products-checkout-comment",
+      "products-checkout-flow-comment",
     );
-    const checkoutStatus = document.getElementById("products-checkout-status");
-    const orderSubmit = document.getElementById("products-order-submit");
-    const checkoutBack = document.getElementById("products-checkout-back");
+    const checkoutStreet = document.getElementById(
+      "products-checkout-flow-street",
+    );
+    const checkoutBuilding = document.getElementById(
+      "products-checkout-flow-building",
+    );
+    const checkoutApartment = document.getElementById(
+      "products-checkout-flow-apartment",
+    );
+    const checkoutEntrance = document.getElementById(
+      "products-checkout-flow-entrance",
+    );
+    const checkoutFloor = document.getElementById(
+      "products-checkout-flow-floor",
+    );
+    const checkoutIntercom = document.getElementById(
+      "products-checkout-flow-intercom",
+    );
+    const checkoutEmail = document.getElementById(
+      "products-checkout-flow-email",
+    );
+    const checkoutRegion = document.getElementById(
+      "products-checkout-flow-region",
+    );
+    const checkoutSector = document.getElementById(
+      "products-checkout-flow-sector",
+    );
+    const checkoutPharmacy = document.getElementById(
+      "products-checkout-flow-pharmacy",
+    );
+    const checkoutDeliveryWindows = document.getElementById(
+      "products-checkout-flow-delivery-windows",
+    );
+    const checkoutReview = document.getElementById(
+      "products-checkout-flow-review",
+    );
+    const checkoutConsent = document.getElementById(
+      "products-checkout-flow-consent",
+    );
+    const checkoutStatus = document.getElementById(
+      "products-checkout-flow-status",
+    );
+    const orderSubmit = document.getElementById(
+      "products-checkout-flow-submit",
+    );
+    const checkoutBack = document.getElementById("products-checkout-flow-back");
 
     const normalizeText = (value) => String(value || "").trim();
     const normalizeLanguage = (value) => {
@@ -544,6 +591,19 @@
         checkoutCity,
         checkoutAddress,
         checkoutComment,
+        checkoutStreet,
+        checkoutBuilding,
+        checkoutApartment,
+        checkoutEntrance,
+        checkoutFloor,
+        checkoutIntercom,
+        checkoutEmail,
+        checkoutRegion,
+        checkoutSector,
+        checkoutPharmacy,
+        checkoutDeliveryWindows,
+        checkoutReview,
+        checkoutConsent,
         checkoutStatus,
         orderSubmit,
         checkoutBack,
@@ -567,6 +627,9 @@
         closeCart: () => {},
         openCheckout: () => {},
         closeCheckout: () => {},
+        nextCheckoutStep: () => {},
+        previousCheckoutStep: () => {},
+        setCheckoutStep: (_step) => {},
         submitOrder: () => Promise.resolve(),
       },
       tools: {

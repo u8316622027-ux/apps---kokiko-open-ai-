@@ -91,6 +91,96 @@ test("products cart opens as a centered modal", async ({ page }) => {
   expect(box.width).toBeGreaterThan(560);
 });
 
+test("products widget syncs cart actions through cart tools", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.__KOKIKO_CART_CALLS__ = [];
+    window.openai = {
+      callTool: async (name, args) => {
+        window.__KOKIKO_CART_CALLS__.push({ name, args });
+        const items = Array.isArray(args?.cart?.items) ? args.cart.items : [];
+        const product = args?.product
+          ? {
+              ...args.product,
+              quantity: args.quantity || args.product.quantity || 1,
+            }
+          : null;
+        const nextItems =
+          name === "add_to_cart" && product
+            ? items.concat(product)
+            : name === "remove_from_cart"
+              ? items.filter((item) => item.id !== args.product_id)
+              : items.map((item) =>
+                  item.id === args.product_id
+                    ? { ...item, quantity: args.quantity }
+                    : item,
+                );
+        return {
+          structuredContent: {
+            cart: {
+              token: "cart-token-123",
+              synced: true,
+              items: nextItems,
+            },
+          },
+        };
+      },
+    };
+  });
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await expect
+    .poll(() => page.evaluate(() => window.__KOKIKO_CART_CALLS__.length))
+    .toBe(1);
+
+  await page.locator("#products-cart-button").click();
+  await page.getByRole("button", { name: /increase/i }).click();
+  await page.getByRole("button", { name: /remove/i }).click();
+
+  const calls = await page.evaluate(() => window.__KOKIKO_CART_CALLS__);
+  expect(calls.map((call) => call.name)).toEqual([
+    "add_to_cart",
+    "update_cart_item",
+    "remove_from_cart",
+  ]);
+  expect(calls[0].args.product.id).toBe("cream-1");
+  expect(calls[1].args.cart.token).toBe("cart-token-123");
+  expect(calls[2].args.cart.token).toBe("cart-token-123");
+});
+
+test("products cart keeps checkout out of the cart list scroll", async ({
+  page,
+}) => {
+  const htmlPath = path.resolve(process.cwd(), "app/widgets/products.html");
+  const htmlUrl = `file:///${htmlPath.replace(/\\/g, "/")}`;
+
+  await page.setViewportSize({ width: 768, height: 720 });
+  await page.addInitScript(() => {
+    window.localStorage.clear();
+    window.__APTEKA_WIDGET_PAYLOAD__ = {
+      widget: { open: { page: "cart" } },
+      cart: {
+        items: Array.from({ length: 8 }, (_, index) => ({
+          id: `cream-${index + 1}`,
+          name: `Face cream ${index + 1}`,
+          price: 99,
+          quantity: 1,
+        })),
+      },
+    };
+  });
+
+  await page.goto(htmlUrl, { waitUntil: "domcontentloaded" });
+
+  const panelOverflow = await page
+    .locator("#products-cart-panel")
+    .evaluate((element) => getComputedStyle(element).overflowY);
+  expect(panelOverflow).toBe("hidden");
+  await expect(page.locator("#products-cart-checkout")).toBeVisible();
+});
+
 test("products widget submits checkout form through order tool", async ({
   page,
 }) => {
@@ -114,26 +204,46 @@ test("products widget submits checkout form through order tool", async ({
   await page.locator("#products-cart-button").click();
   await page.locator("#products-cart-checkout").click();
 
-  await expect(page.locator("#products-checkout-form")).toBeVisible();
-  await page.locator("#products-checkout-name").fill("Ana Popescu");
-  await page.locator("#products-checkout-phone").fill("079 802 000");
-  await page.locator('input[value="courier"]').check();
-  await page.locator("#products-checkout-city").fill("Chisinau");
-  await page.locator("#products-checkout-address").fill("str. Alecu Russo, 1");
-  await page.locator("#products-checkout-comment").fill("Call before delivery");
-  await page.locator("#products-order-submit").click();
+  await expect(page.locator("#products-cart-panel")).toHaveClass(/is-checkout/);
+  await expect(page.locator("#products-cart-items")).toBeHidden();
+  await expect(page.locator("#products-checkout-flow")).toBeVisible();
+  await expect(page.locator('[data-checkout-step="delivery"]')).toBeVisible();
+  await page.locator('#products-checkout-flow input[value="courier"]').check();
+  await page.locator('[data-checkout-action="next"]').click();
 
-  await expect(page.locator("#products-checkout-status")).toContainText(
+  await expect(page.locator('[data-checkout-step="address"]')).toBeVisible();
+  await page.locator("#products-checkout-flow-name").fill("Ana Popescu");
+  await page.locator("#products-checkout-flow-phone").fill("079 802 000");
+  await page.locator("#products-checkout-flow-street").fill("str. Alecu Russo");
+  await page.locator("#products-checkout-flow-building").fill("1");
+  await page
+    .locator("#products-checkout-flow-comment")
+    .fill("Call before delivery");
+  await page.locator('[data-checkout-action="next"]').click();
+
+  await expect(page.locator('[data-checkout-step="review"]')).toBeVisible();
+  await page.locator('#products-checkout-flow input[value="cash"]').check();
+  await page.locator("#products-checkout-flow-consent").check();
+  await page.locator("#products-checkout-flow-submit").click();
+
+  await expect(page.locator("#products-checkout-flow-status")).toContainText(
     "770001",
   );
   await expect(page.locator("#products-cart-button")).toContainText("0");
 
   const calls = await page.evaluate(() => window.__KOKIKO_ORDER_CALLS__);
-  expect(calls).toHaveLength(1);
-  expect(calls[0].name).toBe("submit_order");
-  expect(calls[0].args.customer_name).toBe("Ana Popescu");
-  expect(calls[0].args.delivery_method).toBe("courier");
-  expect(calls[0].args.items[0].id).toBe("cream-1");
+  const submitCall = calls.find((call) => call.name === "submit_order");
+  expect(calls.map((call) => call.name)).toContain("add_to_cart");
+  expect(submitCall).toBeDefined();
+  if (!submitCall) {
+    return;
+  }
+  expect(submitCall.args.customer_name).toBe("Ana Popescu");
+  expect(submitCall.args.delivery_method).toBe("courier");
+  expect(submitCall.args.street).toBe("str. Alecu Russo");
+  expect(submitCall.args.building).toBe("1");
+  expect(submitCall.args.payment_method).toBe("cash");
+  expect(submitCall.args.items[0].id).toBe("cream-1");
 });
 
 test("products checkout form can scroll on short screens", async ({ page }) => {
@@ -144,13 +254,12 @@ test("products checkout form can scroll on short screens", async ({ page }) => {
   await page.locator("#products-cart-button").click();
   await page.locator("#products-cart-checkout").click();
 
-  const panel = page.locator("#products-cart-panel");
-  await expect(page.locator("#products-checkout-form")).toBeVisible();
-  await page.locator("#products-order-submit").scrollIntoViewIfNeeded();
-  await expect(page.locator("#products-order-submit")).toBeVisible();
-  const canScroll = await panel.evaluate(
-    (element) => element.scrollHeight > element.clientHeight,
-  );
+  await expect(page.locator("#products-checkout-flow")).toBeVisible();
+  await page.locator('[data-checkout-action="next"]').scrollIntoViewIfNeeded();
+  await expect(page.locator('[data-checkout-action="next"]')).toBeVisible();
+  const canScroll = await page
+    .locator("#products-checkout-flow")
+    .evaluate((element) => element.scrollHeight > element.clientHeight);
   expect(canScroll).toBeTruthy();
 });
 

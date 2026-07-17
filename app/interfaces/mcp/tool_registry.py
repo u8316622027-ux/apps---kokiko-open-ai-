@@ -84,6 +84,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
                 "properties": {
                     "customer_name": {"type": "string"},
                     "customer_phone": {"type": "string"},
+                    "cart_token": {"type": "string"},
                     "email": {"type": "string"},
                     "delivery_method": {
                         "type": "string",
@@ -105,6 +106,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
                         "type": "string",
                         "description": "cash, card, card-online, mia, iban",
                     },
+                    "delivery_window": {"type": "object"},
                     "use_bonuses": {"type": "boolean"},
                     "promo_code": {"type": "string"},
                     "comment": {"type": "string"},
@@ -134,8 +136,9 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             name="add_to_cart",
             title="Add to cart",
             description=(
-                "Add a product to a cart payload for text-driven cart control. "
-                "Returns structuredContent.cart and opens the cart widget."
+                "Add a product to a cart payload for text-driven cart control, "
+                "sync numeric product ids to Kokiko cart API, and return "
+                "structuredContent.cart with token/synced metadata."
             ),
             input_schema=_cart_mutation_schema(require_product=True),
             handler=_add_to_cart_handler,
@@ -155,8 +158,9 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             name="remove_from_cart",
             title="Remove from cart",
             description=(
-                "Remove a product from a cart payload for text-driven cart control. "
-                "Returns structuredContent.cart and opens the cart widget."
+                "Remove a product from a cart payload for text-driven cart control, "
+                "sync the remaining numeric product ids to Kokiko cart API, and return "
+                "structuredContent.cart with token/synced metadata."
             ),
             input_schema=_cart_mutation_schema(require_product_id=True),
             handler=_remove_from_cart_handler,
@@ -176,8 +180,9 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             name="update_cart_item",
             title="Update cart item",
             description=(
-                "Set product quantity in a cart payload for text-driven cart control. "
-                "Returns structuredContent.cart and opens the cart widget."
+                "Set product quantity in a cart payload for text-driven cart control, "
+                "sync numeric product ids to Kokiko cart API, and return "
+                "structuredContent.cart with token/synced metadata."
             ),
             input_schema=_cart_mutation_schema(require_product_id=True, require_quantity=True),
             handler=_update_cart_item_handler,
@@ -313,6 +318,8 @@ def _cart_mutation_schema(
             },
             "product_id": {"type": "string"},
             "quantity": {"type": "integer", "minimum": 1},
+            "cart_token": {"type": "string"},
+            "language": {"type": "string"},
         },
         "required": required,
     }
