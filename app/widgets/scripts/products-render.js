@@ -39,7 +39,7 @@
       const language = getActiveLanguage();
       if (language === "ro") {
         return {
-          add: "Adaugă",
+          add: "Cumpără",
           added: "În coș",
           cart: "Coș",
           empty: "Coșul este gol",
@@ -54,7 +54,7 @@
         };
       }
       return {
-        add: "В корзину",
+        add: "Купить",
         added: "В корзине",
         cart: "Корзина",
         empty: "Корзина пуста",
@@ -531,14 +531,10 @@
             normalizeText(product.productUrl) || "https://www.kokiko.md/",
           );
           const copy = getCartCopy();
-          const cartLine = findCartItem(product.id);
-          const cartLabel = cartLine
-            ? `${copy.added}: ${cartLine.quantity}`
-            : copy.add;
           const actionButton = inStock
             ? `<div class="product-card-actions">
                 <button class="add-to-cart-button" type="button" data-action="add-to-cart" data-product-id="${safeProductId}" aria-label="Add to cart ${safeName}">
-                  ${escapeHtml(cartLabel)}
+                  ${escapeHtml(copy.add)}
                 </button>
                 <a class="buy-link product-details-link" href="${safeProductUrl}" target="_blank" rel="noopener noreferrer" aria-label="Open product page">
                   <svg class="products-icon products-icon--external" viewBox="0 0 24 24" aria-hidden="true">

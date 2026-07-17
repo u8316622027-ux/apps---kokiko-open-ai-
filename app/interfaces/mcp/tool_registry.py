@@ -7,6 +7,12 @@ from typing import Any, Callable
 
 from app.core.config import get_settings
 from app.interfaces.mcp.tools.apteka_urls import get_apteka_base_url
+from app.interfaces.mcp.tools.cart_tools import (
+    add_to_cart,
+    check_cart,
+    remove_from_cart,
+    update_cart_item,
+)
 from app.interfaces.mcp.tools.order_tools import submit_order
 from app.interfaces.mcp.tools.search_tools import search_products
 
@@ -104,6 +110,90 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
                 "invoked": "Order submitted.",
             },
         ),
+        "add_to_cart": ToolDefinition(
+            name="add_to_cart",
+            title="Add to cart",
+            description=(
+                "Add a product to a cart payload for text-driven cart control. "
+                "Returns structuredContent.cart and opens the cart widget."
+            ),
+            input_schema=_cart_mutation_schema(require_product=True),
+            handler=_add_to_cart_handler,
+            output_template="ui://widget/products.html",
+            ui=widget_ui_config,
+            annotations={
+                "readOnlyHint": False,
+                "openWorldHint": False,
+                "destructiveHint": False,
+            },
+            tool_invocation={
+                "invoking": "Adding product to cart...",
+                "invoked": "Cart updated.",
+            },
+        ),
+        "remove_from_cart": ToolDefinition(
+            name="remove_from_cart",
+            title="Remove from cart",
+            description=(
+                "Remove a product from a cart payload for text-driven cart control. "
+                "Returns structuredContent.cart and opens the cart widget."
+            ),
+            input_schema=_cart_mutation_schema(require_product_id=True),
+            handler=_remove_from_cart_handler,
+            output_template="ui://widget/products.html",
+            ui=widget_ui_config,
+            annotations={
+                "readOnlyHint": False,
+                "openWorldHint": False,
+                "destructiveHint": False,
+            },
+            tool_invocation={
+                "invoking": "Removing product from cart...",
+                "invoked": "Cart updated.",
+            },
+        ),
+        "update_cart_item": ToolDefinition(
+            name="update_cart_item",
+            title="Update cart item",
+            description=(
+                "Set product quantity in a cart payload for text-driven cart control. "
+                "Returns structuredContent.cart and opens the cart widget."
+            ),
+            input_schema=_cart_mutation_schema(require_product_id=True, require_quantity=True),
+            handler=_update_cart_item_handler,
+            output_template="ui://widget/products.html",
+            ui=widget_ui_config,
+            annotations={
+                "readOnlyHint": False,
+                "openWorldHint": False,
+                "destructiveHint": False,
+            },
+            tool_invocation={
+                "invoking": "Updating cart...",
+                "invoked": "Cart updated.",
+            },
+        ),
+        "check_cart": ToolDefinition(
+            name="check_cart",
+            title="Check cart",
+            description=(
+                "Normalize and summarize a cart payload for text-driven cart control. "
+                "Returns structuredContent.cart and opens the cart widget."
+            ),
+            input_schema=_cart_mutation_schema(),
+            handler=_check_cart_handler,
+            output_template="ui://widget/products.html",
+            ui=widget_ui_config,
+            annotations={
+                "readOnlyHint": True,
+                "openWorldHint": False,
+                "destructiveHint": False,
+            },
+            tool_invocation={
+                "invoking": "Checking cart...",
+                "invoked": "Cart checked.",
+            },
+        ),
     }
 
 
@@ -172,7 +262,40 @@ def decorate_tool_result(
 def _resolve_widget_page(tool_name: str) -> str:
     if tool_name == "search_products":
         return "search"
+    if tool_name in {"add_to_cart", "remove_from_cart", "update_cart_item", "check_cart"}:
+        return "cart"
     return "default"
+
+
+def _cart_mutation_schema(
+    *,
+    require_product: bool = False,
+    require_product_id: bool = False,
+    require_quantity: bool = False,
+) -> dict[str, Any]:
+    required: list[str] = []
+    if require_product:
+        required.append("product")
+    if require_product_id:
+        required.append("product_id")
+    if require_quantity:
+        required.append("quantity")
+    return {
+        "type": "object",
+        "properties": {
+            "cart": {
+                "type": "object",
+                "description": "Current cart payload with an items array.",
+            },
+            "product": {
+                "type": "object",
+                "description": "Product to add: id, name, price, quantity, image_url, product_url.",
+            },
+            "product_id": {"type": "string"},
+            "quantity": {"type": "integer", "minimum": 1},
+        },
+        "required": required,
+    }
 
 
 def _build_widget_ui_config() -> dict[str, Any]:
@@ -211,3 +334,19 @@ def _search_products_handler(arguments: dict[str, Any]) -> dict[str, Any]:
 
 def _submit_order_handler(arguments: dict[str, Any]) -> dict[str, Any]:
     return submit_order(arguments)
+
+
+def _add_to_cart_handler(arguments: dict[str, Any]) -> dict[str, Any]:
+    return add_to_cart(arguments)
+
+
+def _remove_from_cart_handler(arguments: dict[str, Any]) -> dict[str, Any]:
+    return remove_from_cart(arguments)
+
+
+def _update_cart_item_handler(arguments: dict[str, Any]) -> dict[str, Any]:
+    return update_cart_item(arguments)
+
+
+def _check_cart_handler(arguments: dict[str, Any]) -> dict[str, Any]:
+    return check_cart(arguments)

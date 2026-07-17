@@ -10,6 +10,10 @@
       getActiveLanguage,
       extractItems,
       mapProduct,
+      resolveImageUrl,
+      getFallbackImage,
+      normalizeCartQuantity,
+      writeStoredCart,
       setLoading,
       debugLog,
     } = utils;
@@ -43,6 +47,62 @@
         Object.prototype.hasOwnProperty.call(payload, "no_results") ||
         Object.prototype.hasOwnProperty.call(payload, "query")
       );
+    };
+
+    const extractCartItems = (payload) => {
+      if (!payload || typeof payload !== "object") {
+        return [];
+      }
+      const cartNode =
+        payload.cart && typeof payload.cart === "object" ? payload.cart : {};
+      const candidates = [cartNode.items, payload.cart_items, payload.items];
+      for (const candidate of candidates) {
+        if (Array.isArray(candidate)) {
+          return candidate.filter((item) => item && typeof item === "object");
+        }
+      }
+      return [];
+    };
+
+    const hasCartPayload = (payload) => {
+      if (!payload || typeof payload !== "object") {
+        return false;
+      }
+      return (
+        Boolean(payload.cart && typeof payload.cart === "object") ||
+        Array.isArray(payload.cart_items)
+      );
+    };
+
+    const mapCartItem = (item) => {
+      const id = normalizeText(item.id || item.product_id);
+      const name = normalizeText(item.name);
+      const price = Number(item.price);
+      if (!id || !name || !Number.isFinite(price) || price <= 0) {
+        return null;
+      }
+      return {
+        id,
+        name,
+        manufacturer: normalizeText(item.manufacturer),
+        price,
+        imageUrl:
+          resolveImageUrl(item.image_url || item.imageUrl || item.image) ||
+          getFallbackImage(),
+        productUrl: normalizeText(item.product_url || item.productUrl),
+        quantity: normalizeCartQuantity(item.quantity),
+      };
+    };
+
+    const applyCartPayload = (payload) => {
+      if (!hasCartPayload(payload)) {
+        return false;
+      }
+      state.cartItems = extractCartItems(payload)
+        .map(mapCartItem)
+        .filter(Boolean);
+      writeStoredCart();
+      return true;
     };
 
     const extractInitialToolPayload = () => {
@@ -112,6 +172,7 @@
         state.requestedPage = requestedPage;
       }
       theme?.updateFromPayload(payload);
+      const cartApplied = applyCartPayload(payload);
       const query = normalizeText(payload.query);
       if (query) {
         try {
@@ -134,6 +195,18 @@
         state.products = mapped;
         state.lastQuery = query;
         state.loadedOnce = true;
+        return true;
+      }
+      if (cartApplied) {
+        state.loadedOnce = true;
+        window.setTimeout(() => {
+          if (requestedPage === "checkout") {
+            ctx.actions.openCart();
+            ctx.actions.openCheckout();
+            return;
+          }
+          ctx.actions.openCart();
+        }, 0);
         return true;
       }
       state.loadedOnce = true;
@@ -258,6 +331,7 @@
       }
       setLoading(false);
       ctx.ui.renderProducts();
+      ctx.ui.renderCart();
       return true;
     };
 
@@ -281,6 +355,7 @@
           window.removeEventListener("message", onMessage);
           setLoading(false);
           ctx.ui.renderProducts();
+          ctx.ui.renderCart();
           resolve(true);
         };
 

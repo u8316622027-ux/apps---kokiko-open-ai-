@@ -45,9 +45,13 @@ test("products widget supports cart quantity changes", async ({ page }) => {
   await openWidgetWithProduct(page);
 
   const cartButton = page.locator("#products-cart-button");
+  const addButton = page.locator('[data-action="add-to-cart"]');
+  await expect(addButton).toContainText("Купить");
   await expect(cartButton).toContainText("0");
-  await page.locator('[data-action="add-to-cart"]').click();
+  await addButton.click();
   await expect(cartButton).toContainText("1");
+  await expect(addButton).toContainText("Купить");
+  await expect(addButton).not.toContainText(/В корзине|In cart|\d/);
 
   await cartButton.click();
   await expect(page.locator("#products-cart-panel")).toBeVisible();
@@ -68,6 +72,23 @@ test("products widget supports cart quantity changes", async ({ page }) => {
   await expect(page.locator("#products-cart-items")).toContainText(
     /Cart is empty|Корзина пуста|Coșul este gol/,
   );
+});
+
+test("products cart opens as a centered modal", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+
+  const box = await page.locator("#products-cart-panel").boundingBox();
+  expect(box).not.toBeNull();
+  if (!box) {
+    return;
+  }
+  const modalCenter = box.x + box.width / 2;
+  expect(Math.abs(modalCenter - 640)).toBeLessThan(90);
+  expect(box.width).toBeGreaterThan(560);
 });
 
 test("products widget submits checkout form through order tool", async ({
@@ -113,6 +134,59 @@ test("products widget submits checkout form through order tool", async ({
   expect(calls[0].args.customer_name).toBe("Ana Popescu");
   expect(calls[0].args.delivery_method).toBe("courier");
   expect(calls[0].args.items[0].id).toBe("cream-1");
+});
+
+test("products checkout form can scroll on short screens", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 480 });
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+
+  const panel = page.locator("#products-cart-panel");
+  await expect(page.locator("#products-checkout-form")).toBeVisible();
+  await page.locator("#products-order-submit").scrollIntoViewIfNeeded();
+  await expect(page.locator("#products-order-submit")).toBeVisible();
+  const canScroll = await panel.evaluate(
+    (element) => element.scrollHeight > element.clientHeight,
+  );
+  expect(canScroll).toBeTruthy();
+});
+
+test("products widget applies cart payload from text tools", async ({
+  page,
+}) => {
+  const htmlPath = path.resolve(process.cwd(), "app/widgets/products.html");
+  const htmlUrl = `file:///${htmlPath.replace(/\\/g, "/")}`;
+
+  await page.addInitScript(() => {
+    window.localStorage.clear();
+    window.__APTEKA_WIDGET_PAYLOAD__ = {
+      widget: { open: { page: "cart" } },
+      cart: {
+        items: [
+          {
+            id: "cream-1",
+            name: "Face cream",
+            price: 99,
+            quantity: 2,
+            product_url: "https://www.kokiko.md/ru/product/face-cream",
+          },
+        ],
+      },
+    };
+  });
+
+  await page.goto(htmlUrl, { waitUntil: "domcontentloaded" });
+
+  await expect(page.locator("#products-cart-panel")).toBeVisible();
+  await expect(page.locator("#products-cart-items")).toContainText(
+    "Face cream",
+  );
+  await expect(page.locator("#products-cart-total")).toContainText(
+    "198.00 MDL",
+  );
 });
 
 for (const viewport of [

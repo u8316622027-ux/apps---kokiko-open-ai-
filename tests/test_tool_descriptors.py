@@ -46,6 +46,19 @@ def test_submit_order_tool_descriptor_allows_checkout_submission() -> None:
     assert payload["inputSchema"]["required"] == ["customer_name", "customer_phone", "items"]
 
 
+def test_cart_tools_are_registered_for_text_control() -> None:
+    registry = tool_registry.create_tool_registry()
+
+    for name in ("add_to_cart", "remove_from_cart", "update_cart_item", "check_cart"):
+        payload = tool_registry.serialize_tool_definition(registry[name])
+        assert payload["outputTemplate"] == "ui://widget/products.html"
+        assert payload["_meta"]["openai/outputTemplate"] == "ui://widget/products.html"
+        assert payload["annotations"]["destructiveHint"] is False
+
+    assert registry["check_cart"].annotations["readOnlyHint"] is True
+    assert registry["add_to_cart"].annotations["readOnlyHint"] is False
+
+
 def test_theme_tool_is_removed() -> None:
     registry = tool_registry.create_tool_registry()
     assert "set_widget_theme" not in registry

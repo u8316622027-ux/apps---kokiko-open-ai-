@@ -19,7 +19,14 @@ def test_create_tool_registry_uses_base_handlers() -> None:
     base_registry = tool_registry.create_tool_registry()
     server_registry = mcp_server.create_tool_registry()
 
-    for name in ("search_products", "submit_order"):
+    for name in (
+        "search_products",
+        "submit_order",
+        "add_to_cart",
+        "remove_from_cart",
+        "update_cart_item",
+        "check_cart",
+    ):
         assert server_registry[name].handler is base_registry[name].handler
 
 
