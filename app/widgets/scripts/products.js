@@ -28,6 +28,9 @@
     cartLayer,
     cartPanel,
     cartItems,
+    cartCheckout,
+    checkoutForm,
+    checkoutBack,
   } = dom;
 
   const scrollTrack = (direction) => {
@@ -70,6 +73,25 @@
     event.preventDefault();
     event.stopPropagation();
     actions.openCart();
+  });
+
+  cartCheckout?.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (state.checkoutOpen) {
+      actions.closeCheckout();
+      return;
+    }
+    actions.openCheckout();
+  });
+
+  checkoutBack?.addEventListener("click", (event) => {
+    event.preventDefault();
+    actions.closeCheckout();
+  });
+
+  checkoutForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    actions.submitOrder();
   });
 
   cartPanel?.addEventListener("click", (event) => {

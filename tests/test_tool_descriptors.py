@@ -35,6 +35,17 @@ def test_tool_descriptor_annotations() -> None:
     assert payload["annotations"]["destructiveHint"] is False
 
 
+def test_submit_order_tool_descriptor_allows_checkout_submission() -> None:
+    registry = tool_registry.create_tool_registry()
+    payload = tool_registry.serialize_tool_definition(registry["submit_order"])
+
+    assert "outputTemplate" not in payload
+    assert payload["annotations"]["readOnlyHint"] is False
+    assert payload["annotations"]["destructiveHint"] is False
+    assert payload["_meta"]["openai/toolInvocation/invoking"]
+    assert payload["inputSchema"]["required"] == ["customer_name", "customer_phone", "items"]
+
+
 def test_theme_tool_is_removed() -> None:
     registry = tool_registry.create_tool_registry()
     assert "set_widget_theme" not in registry

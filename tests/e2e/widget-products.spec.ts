@@ -70,6 +70,51 @@ test("products widget supports cart quantity changes", async ({ page }) => {
   );
 });
 
+test("products widget submits checkout form through order tool", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.__KOKIKO_ORDER_CALLS__ = [];
+    window.openai = {
+      callTool: async (name, args) => {
+        window.__KOKIKO_ORDER_CALLS__.push({ name, args });
+        return {
+          structuredContent: {
+            status: "received",
+            order_id: "KOKIKO-TEST",
+          },
+        };
+      },
+    };
+  });
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+
+  await expect(page.locator("#products-checkout-form")).toBeVisible();
+  await page.locator("#products-checkout-name").fill("Ana Popescu");
+  await page.locator("#products-checkout-phone").fill("079 802 000");
+  await page.locator('input[value="courier"]').check();
+  await page.locator("#products-checkout-city").fill("Chisinau");
+  await page.locator("#products-checkout-address").fill("str. Alecu Russo, 1");
+  await page.locator("#products-checkout-comment").fill("Call before delivery");
+  await page.locator("#products-order-submit").click();
+
+  await expect(page.locator("#products-checkout-status")).toContainText(
+    "KOKIKO-TEST",
+  );
+  await expect(page.locator("#products-cart-button")).toContainText("0");
+
+  const calls = await page.evaluate(() => window.__KOKIKO_ORDER_CALLS__);
+  expect(calls).toHaveLength(1);
+  expect(calls[0].name).toBe("submit_order");
+  expect(calls[0].args.customer_name).toBe("Ana Popescu");
+  expect(calls[0].args.delivery_method).toBe("courier");
+  expect(calls[0].args.items[0].id).toBe("cream-1");
+});
+
 for (const viewport of [
   { width: 320, height: 720 },
   { width: 768, height: 720 },

@@ -7,6 +7,7 @@ from typing import Any, Callable
 
 from app.core.config import get_settings
 from app.interfaces.mcp.tools.apteka_urls import get_apteka_base_url
+from app.interfaces.mcp.tools.order_tools import submit_order
 from app.interfaces.mcp.tools.search_tools import search_products
 
 
@@ -62,6 +63,45 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             tool_invocation={
                 "invoking": "Searching products...",
                 "invoked": "Products found.",
+            },
+        ),
+        "submit_order": ToolDefinition(
+            name="submit_order",
+            title="Submit order",
+            description=(
+                "Submit a KoKiKo checkout order from the widget cart. "
+                "Returns a received status, order id, normalized items and total."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "customer_name": {"type": "string"},
+                    "customer_phone": {"type": "string"},
+                    "delivery_method": {
+                        "type": "string",
+                        "description": "pickup or courier",
+                    },
+                    "city": {"type": "string"},
+                    "address": {"type": "string"},
+                    "comment": {"type": "string"},
+                    "items": {
+                        "type": "array",
+                        "items": {"type": "object"},
+                    },
+                },
+                "required": ["customer_name", "customer_phone", "items"],
+            },
+            handler=_submit_order_handler,
+            output_template="",
+            ui=widget_ui_config,
+            annotations={
+                "readOnlyHint": False,
+                "openWorldHint": False,
+                "destructiveHint": False,
+            },
+            tool_invocation={
+                "invoking": "Submitting order...",
+                "invoked": "Order submitted.",
             },
         ),
     }
@@ -167,3 +207,7 @@ def _search_products_handler(arguments: dict[str, Any]) -> dict[str, Any]:
     limit = int(arguments.get("limit", 10))
     language = arguments.get("language")
     return search_products(query, limit=limit, language=language)
+
+
+def _submit_order_handler(arguments: dict[str, Any]) -> dict[str, Any]:
+    return submit_order(arguments)

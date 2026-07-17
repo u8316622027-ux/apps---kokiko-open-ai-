@@ -12,6 +12,14 @@
       cartItems,
       cartTotal,
       cartCheckout,
+      checkoutForm,
+      checkoutName,
+      checkoutPhone,
+      checkoutCity,
+      checkoutAddress,
+      checkoutComment,
+      checkoutStatus,
+      orderSubmit,
     } = dom;
     const {
       normalizeText,
@@ -35,7 +43,13 @@
           added: "În coș",
           cart: "Coș",
           empty: "Coșul este gol",
+          errorAddress: "Introduceți adresa pentru livrare prin curier.",
+          errorContact: "Introduceți numele și telefonul.",
+          errorItems: "Coșul este gol.",
+          errorSubmit: "Comanda nu a putut fi trimisă. Încercați din nou.",
           open: "Coș",
+          sending: "Se trimite comanda...",
+          success: "Comanda a fost primită",
           total: "Total",
         };
       }
@@ -44,7 +58,13 @@
         added: "В корзине",
         cart: "Корзина",
         empty: "Корзина пуста",
+        errorAddress: "Укажите адрес для курьерской доставки.",
+        errorContact: "Укажите имя и телефон.",
+        errorItems: "Корзина пуста.",
+        errorSubmit: "Не удалось отправить заказ. Попробуйте еще раз.",
         open: "Корзина",
+        sending: "Отправляем заказ...",
+        success: "Заказ принят",
         total: "Итого",
       };
     };
@@ -81,11 +101,153 @@
       cartButton?.setAttribute("aria-expanded", String(isOpen));
       if (isOpen) {
         renderCart();
+        renderCheckout();
         window.setTimeout(() => {
           if (cartPanel instanceof HTMLElement) {
             cartPanel.focus();
           }
         }, 0);
+      }
+    };
+
+    const setCheckoutOpen = (nextState) => {
+      const isOpen = Boolean(nextState);
+      if (isOpen && !state.cartItems.length && !state.orderSubmitted) {
+        return;
+      }
+      if (isOpen) {
+        state.orderSubmitted = false;
+        setCheckoutStatus("", "");
+      } else {
+        state.orderSubmitted = false;
+      }
+      state.checkoutOpen = isOpen;
+      renderCheckout();
+      if (isOpen) {
+        window.setTimeout(() => {
+          if (checkoutName instanceof HTMLInputElement) {
+            checkoutName.focus();
+          }
+        }, 0);
+      }
+    };
+
+    const getDeliveryMethod = () => {
+      const selected = document.querySelector(
+        'input[name="products-delivery-method"]:checked',
+      );
+      if (
+        selected instanceof HTMLInputElement &&
+        selected.value === "courier"
+      ) {
+        return "courier";
+      }
+      return "pickup";
+    };
+
+    const setCheckoutStatus = (message, tone = "") => {
+      if (!(checkoutStatus instanceof HTMLElement)) {
+        return;
+      }
+      checkoutStatus.textContent = normalizeText(message);
+      checkoutStatus.dataset.tone = normalizeText(tone);
+    };
+
+    const getCheckoutValue = (element) => {
+      if (
+        element instanceof HTMLInputElement ||
+        element instanceof HTMLTextAreaElement
+      ) {
+        return normalizeText(element.value);
+      }
+      return "";
+    };
+
+    const buildOrderPayload = () => ({
+      customer_name: getCheckoutValue(checkoutName),
+      customer_phone: getCheckoutValue(checkoutPhone),
+      delivery_method: getDeliveryMethod(),
+      city: getCheckoutValue(checkoutCity) || "Chisinau",
+      address: getCheckoutValue(checkoutAddress),
+      comment: getCheckoutValue(checkoutComment),
+      language: getActiveLanguage(),
+      total: getCartTotal(),
+      items: state.cartItems.map((item) => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        product_url: item.productUrl,
+      })),
+    });
+
+    const validateOrderPayload = (payload) => {
+      const copy = getCartCopy();
+      if (!payload.items.length) {
+        return copy.errorItems;
+      }
+      if (!payload.customer_name || !payload.customer_phone) {
+        return copy.errorContact;
+      }
+      if (payload.delivery_method === "courier" && !payload.address) {
+        return copy.errorAddress;
+      }
+      return "";
+    };
+
+    const submitOrder = async () => {
+      if (state.isSubmittingOrder) {
+        return;
+      }
+      const payload = buildOrderPayload();
+      const validationError = validateOrderPayload(payload);
+      if (validationError) {
+        setCheckoutStatus(validationError, "error");
+        return;
+      }
+      if (typeof window.openai?.callTool !== "function") {
+        setCheckoutStatus(getCartCopy().errorSubmit, "error");
+        debugLog("submit_order_unavailable", { level: "warn" });
+        return;
+      }
+
+      state.isSubmittingOrder = true;
+      renderCheckout();
+      setCheckoutStatus(getCartCopy().sending, "muted");
+      try {
+        const toolResult = await window.openai.callTool(
+          "submit_order",
+          payload,
+        );
+        const structuredContent =
+          (toolResult &&
+            typeof toolResult === "object" &&
+            toolResult.structuredContent) ||
+          toolResult ||
+          {};
+        const orderId = normalizeText(structuredContent.order_id);
+        state.cartItems = [];
+        state.orderSubmitted = true;
+        state.checkoutOpen = true;
+        writeStoredCart();
+        renderCart();
+        renderProducts();
+        setCheckoutStatus(
+          orderId
+            ? `${getCartCopy().success}: ${orderId}`
+            : getCartCopy().success,
+          "success",
+        );
+        debugLog("submit_order_success", { orderId });
+      } catch (error) {
+        setCheckoutStatus(getCartCopy().errorSubmit, "error");
+        debugLog("submit_order_error", {
+          message: String(error?.message ? error.message : error),
+          level: "error",
+        });
+      } finally {
+        state.isSubmittingOrder = false;
+        renderCheckout();
       }
     };
 
@@ -110,6 +272,7 @@
           quantity: 1,
         });
       }
+      state.orderSubmitted = false;
       debugLog("cart_add", { productId: product.id });
       persistAndRenderCart();
     };
@@ -174,6 +337,10 @@
             <p>${escapeHtml(copy.empty)}</p>
           </div>
         `;
+        if (!state.orderSubmitted) {
+          state.checkoutOpen = false;
+        }
+        renderCheckout();
         return;
       }
       cartItems.innerHTML = state.cartItems
@@ -217,6 +384,44 @@
           `;
         })
         .join("");
+      renderCheckout();
+    };
+
+    const renderCheckout = () => {
+      if (!(checkoutForm instanceof HTMLElement)) {
+        return;
+      }
+      const shouldShowCheckout = state.checkoutOpen || state.orderSubmitted;
+      checkoutForm.hidden = !shouldShowCheckout;
+      if (cartCheckout instanceof HTMLButtonElement) {
+        cartCheckout.textContent = shouldShowCheckout
+          ? getCartCopy().cart
+          : "Оформить заказ";
+        cartCheckout.disabled =
+          state.isSubmittingOrder ||
+          (!state.cartItems.length && !state.orderSubmitted);
+      }
+      if (orderSubmit instanceof HTMLButtonElement) {
+        orderSubmit.disabled =
+          state.isSubmittingOrder || !state.cartItems.length;
+        orderSubmit.textContent = state.isSubmittingOrder
+          ? getCartCopy().sending
+          : "Отправить заказ";
+      }
+      const formControls = checkoutForm.querySelectorAll(
+        "input, textarea, button",
+      );
+      for (const control of formControls) {
+        if (
+          control instanceof HTMLInputElement ||
+          control instanceof HTMLTextAreaElement ||
+          control instanceof HTMLButtonElement
+        ) {
+          control.disabled =
+            state.isSubmittingOrder ||
+            (state.orderSubmitted && control.id !== "products-checkout-back");
+        }
+      }
     };
 
     const renderProducts = () => {
@@ -398,12 +603,17 @@
     ctx.ui.updateCarouselControls = updateCarouselControls;
     ctx.ui.renderProducts = renderProducts;
     ctx.ui.renderCart = renderCart;
+    ctx.ui.renderCheckout = renderCheckout;
     ctx.ui.toggleCart = setCartOpen;
+    ctx.ui.toggleCheckout = setCheckoutOpen;
     ctx.actions.addToCart = addToCart;
     ctx.actions.changeCartQuantity = changeCartQuantity;
     ctx.actions.removeFromCart = removeFromCart;
     ctx.actions.openCart = () => setCartOpen(true);
     ctx.actions.closeCart = () => setCartOpen(false);
+    ctx.actions.openCheckout = () => setCheckoutOpen(true);
+    ctx.actions.closeCheckout = () => setCheckoutOpen(false);
+    ctx.actions.submitOrder = submitOrder;
   };
 
   window.ProductsRender = {

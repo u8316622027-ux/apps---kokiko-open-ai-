@@ -12,6 +12,9 @@
       products: [],
       cartItems: [],
       cartOpen: false,
+      checkoutOpen: false,
+      isSubmittingOrder: false,
+      orderSubmitted: false,
       lastQuery: "",
       apiBaseUrl: "",
       requestedPage: "search",
@@ -34,6 +37,19 @@
     const cartItems = document.getElementById("products-cart-items");
     const cartTotal = document.getElementById("products-cart-total");
     const cartCheckout = document.getElementById("products-cart-checkout");
+    const checkoutForm = document.getElementById("products-checkout-form");
+    const checkoutName = document.getElementById("products-checkout-name");
+    const checkoutPhone = document.getElementById("products-checkout-phone");
+    const checkoutCity = document.getElementById("products-checkout-city");
+    const checkoutAddress = document.getElementById(
+      "products-checkout-address",
+    );
+    const checkoutComment = document.getElementById(
+      "products-checkout-comment",
+    );
+    const checkoutStatus = document.getElementById("products-checkout-status");
+    const orderSubmit = document.getElementById("products-order-submit");
+    const checkoutBack = document.getElementById("products-checkout-back");
 
     const normalizeText = (value) => String(value || "").trim();
     const normalizeLanguage = (value) => {
@@ -522,12 +538,23 @@
         cartItems,
         cartTotal,
         cartCheckout,
+        checkoutForm,
+        checkoutName,
+        checkoutPhone,
+        checkoutCity,
+        checkoutAddress,
+        checkoutComment,
+        checkoutStatus,
+        orderSubmit,
+        checkoutBack,
       },
       ui: {
         renderProducts: () => {},
         renderCart: () => {},
+        renderCheckout: () => {},
         updateCarouselControls: () => {},
         toggleCart: (_nextState) => {},
+        toggleCheckout: (_nextState) => {},
         toggleSupportPopup: (_nextState) => {},
       },
       actions: {
@@ -538,6 +565,9 @@
         removeFromCart: (_productId) => {},
         openCart: () => {},
         closeCart: () => {},
+        openCheckout: () => {},
+        closeCheckout: () => {},
+        submitOrder: () => Promise.resolve(),
       },
       tools: {
         waitForInitialPayload: () => Promise.resolve(false),

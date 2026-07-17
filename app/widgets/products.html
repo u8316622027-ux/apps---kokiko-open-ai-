@@ -135,6 +135,103 @@
 
               <div class="products-cart-items" id="products-cart-items" aria-live="polite"></div>
 
+              <form class="products-checkout-form" id="products-checkout-form" hidden novalidate>
+                <div class="products-checkout-heading">
+                  <p class="products-cart-kicker">KoKiKo</p>
+                  <h3 class="products-checkout-title">Оформление заказа</h3>
+                </div>
+
+                <label class="products-checkout-field">
+                  <span>Имя</span>
+                  <input
+                    id="products-checkout-name"
+                    name="customer_name"
+                    type="text"
+                    autocomplete="name"
+                    required
+                  />
+                </label>
+
+                <label class="products-checkout-field">
+                  <span>Телефон</span>
+                  <input
+                    id="products-checkout-phone"
+                    name="customer_phone"
+                    type="tel"
+                    inputmode="tel"
+                    autocomplete="tel"
+                    required
+                  />
+                </label>
+
+                <fieldset class="products-checkout-delivery">
+                  <legend>Получение</legend>
+                  <label>
+                    <input
+                      type="radio"
+                      name="products-delivery-method"
+                      value="pickup"
+                      checked
+                    />
+                    <span>Самовывоз</span>
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="products-delivery-method"
+                      value="courier"
+                    />
+                    <span>Курьер</span>
+                  </label>
+                </fieldset>
+
+                <label class="products-checkout-field">
+                  <span>Город</span>
+                  <input
+                    id="products-checkout-city"
+                    name="city"
+                    type="text"
+                    autocomplete="address-level2"
+                    value="Chisinau"
+                  />
+                </label>
+
+                <label class="products-checkout-field">
+                  <span>Адрес</span>
+                  <textarea
+                    id="products-checkout-address"
+                    name="address"
+                    rows="2"
+                    autocomplete="street-address"
+                  ></textarea>
+                </label>
+
+                <label class="products-checkout-field">
+                  <span>Комментарий</span>
+                  <textarea
+                    id="products-checkout-comment"
+                    name="comment"
+                    rows="2"
+                  ></textarea>
+                </label>
+
+                <div
+                  class="products-checkout-status"
+                  id="products-checkout-status"
+                  role="status"
+                  aria-live="polite"
+                ></div>
+
+                <div class="products-checkout-actions">
+                  <button class="products-checkout-back" id="products-checkout-back" type="button">
+                    Назад
+                  </button>
+                  <button class="products-order-submit" id="products-order-submit" type="submit">
+                    Отправить заказ
+                  </button>
+                </div>
+              </form>
+
               <footer class="products-cart-footer">
                 <div class="products-cart-total-row">
                   <span>Итого</span>

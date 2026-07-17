@@ -93,6 +93,19 @@ class WidgetTemplateTests(unittest.TestCase):
         self.assertNotIn("products-page-my-cart", template_text)
         self.assertNotIn("products-page-tracking", template_text)
 
+    def test_products_template_includes_checkout_form(self) -> None:
+        template_text = self._read_products_bundle_text()
+        self.assertIn('id="products-checkout-form"', template_text)
+        self.assertIn('id="products-checkout-name"', template_text)
+        self.assertIn('id="products-checkout-phone"', template_text)
+        self.assertIn('name="products-delivery-method"', template_text)
+        self.assertIn('value="pickup"', template_text)
+        self.assertIn('value="courier"', template_text)
+        self.assertIn('id="products-checkout-city"', template_text)
+        self.assertIn('id="products-checkout-address"', template_text)
+        self.assertIn('id="products-order-submit"', template_text)
+        self.assertIn("submit_order", template_text)
+
     def test_products_template_includes_theme_script(self) -> None:
         html_text = Path("app/widgets/products.html").read_text(encoding="utf-8")
         self.assertIn('src="./scripts/products-theme.js"', html_text)
