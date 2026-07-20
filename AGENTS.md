@@ -37,6 +37,12 @@ npx playwright test
 - Обеспечивать `Accessibility minimum`: `aria-label`, `:focus`, контраст, семантика, клавиатурная навигация.
 - Новые frontend-зависимости фиксировать решением в `docs/frontend/decisions/`.
 
+### Mobile-first frontend rules
+- Mobile-first: проектировать и реализовывать интерфейс виджета сначала для `320px`, затем расширять поведение для `768px` и `1280px`.
+- Каждая frontend-правка должна проверять no horizontal overflow на `320px`; overlays, dropdowns, cart, checkout forms и sticky/footer actions должны оставаться внутри Apps iframe viewport.
+- Основные touch targets на мобильных экранах должны быть не меньше `44px` по высоте/ширине, если нет отдельного протестированного исключения.
+- Плотные toolbar/header controls нужно переносить или группировать, а не уменьшать текст до нечитаемого размера; поиск, кнопки корзины, темы и языка не должны перекрывать карточки товаров или checkout.
+
 ## Git workflow (always)
 
 ### Ветки

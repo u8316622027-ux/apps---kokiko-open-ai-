@@ -111,12 +111,12 @@
     }
   });
 
-  const expandCheckoutSelect = (select) => {
-    if (!(select instanceof HTMLSelectElement) || select.options.length < 2) {
-      return;
+  const isMobileCheckoutViewport = () => {
+    try {
+      return window.matchMedia("(max-width: 480px)").matches;
+    } catch (_error) {
+      return window.innerWidth <= 480;
     }
-    select.size = Math.min(8, select.options.length);
-    select.dataset.expanded = "true";
   };
 
   const collapseCheckoutSelect = (select) => {
@@ -125,6 +125,18 @@
     }
     select.size = 0;
     delete select.dataset.expanded;
+  };
+
+  const expandCheckoutSelect = (select) => {
+    if (!(select instanceof HTMLSelectElement) || select.options.length < 2) {
+      return;
+    }
+    if (isMobileCheckoutViewport()) {
+      collapseCheckoutSelect(select);
+      return;
+    }
+    select.size = Math.min(8, select.options.length);
+    select.dataset.expanded = "true";
   };
 
   checkoutForm?.addEventListener("focusin", (event) => {
@@ -266,6 +278,20 @@
   window.addEventListener("resize", ui.updateCarouselControls, {
     passive: true,
   });
+  window.addEventListener(
+    "resize",
+    () => {
+      if (!isMobileCheckoutViewport()) {
+        return;
+      }
+      for (const select of checkoutForm?.querySelectorAll(
+        "select[data-expanded]",
+      ) || []) {
+        collapseCheckoutSelect(select);
+      }
+    },
+    { passive: true },
+  );
   window.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && state.cartOpen) {
       actions.closeCart();

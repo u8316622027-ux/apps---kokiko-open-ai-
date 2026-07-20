@@ -604,6 +604,42 @@ test("products checkout keeps expanded selects inside the app panel", async ({
   expect(boxes.selectBottom).toBeLessThanOrEqual(boxes.panelBottom);
 });
 
+test("products checkout uses native select picker on mobile", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.addInitScript(() => {
+    window.fetch = async (url) => {
+      if (String(url).endsWith("/regions")) {
+        return {
+          ok: true,
+          json: async () =>
+            Array.from({ length: 14 }, (_, index) => ({
+              id: index + 1,
+              translations: { ru: { name: `Region ${index + 1}` } },
+            })),
+        };
+      }
+      if (String(url).endsWith("/pharmacies/list")) {
+        return { ok: true, json: async () => [] };
+      }
+      return { ok: true, json: async () => ({}) };
+    };
+  });
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+  await page.locator('[data-checkout-action="next"]').click();
+  await page.locator("#products-checkout-flow-region").focus();
+
+  await expect(page.locator("#products-checkout-flow-region")).toHaveJSProperty(
+    "size",
+    0,
+  );
+});
+
 test("products checkout courier time slots stay compact in the modal", async ({
   page,
 }) => {
@@ -1027,6 +1063,117 @@ test("products checkout form can scroll on short screens", async ({ page }) => {
     .locator("#products-checkout-flow")
     .evaluate((element) => element.scrollHeight > element.clientHeight);
   expect(canScroll).toBeTruthy();
+});
+
+test("products widget mobile shell does not overflow at 320px", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 720 });
+  await openWidgetWithProduct(page);
+
+  const metrics = await page.evaluate(() => {
+    const selectors = [
+      ".search-toolbar",
+      ".search-logo-link",
+      ".toolbar-actions",
+      ".search-input-wrap",
+      ".carousel-frame",
+      ".product-card",
+    ];
+    const boxes = selectors
+      .map((selector) => {
+        const element = document.querySelector(selector);
+        if (!(element instanceof HTMLElement)) {
+          return null;
+        }
+        const box = element.getBoundingClientRect();
+        return {
+          selector,
+          left: box.left,
+          right: box.right,
+          top: box.top,
+          bottom: box.bottom,
+          width: box.width,
+        };
+      })
+      .filter(Boolean);
+    const logo = boxes.find((box) => box.selector === ".search-logo-link");
+    const search = boxes.find((box) => box.selector === ".search-input-wrap");
+    return {
+      viewport: window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      boxes,
+      searchStartsBelowLogo:
+        Boolean(logo && search) && search.top >= logo.bottom + 4,
+    };
+  });
+
+  expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.viewport);
+  expect(metrics.searchStartsBelowLogo).toBeTruthy();
+  for (const box of metrics.boxes) {
+    expect(box.left).toBeGreaterThanOrEqual(0);
+    expect(box.right).toBeLessThanOrEqual(metrics.viewport);
+  }
+});
+
+test("products checkout mobile keeps primary controls reachable", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+
+  const metrics = await page.evaluate(() => {
+    const panel = document.getElementById("products-cart-panel");
+    const form = document.getElementById("products-checkout-flow");
+    const actions = document.querySelector(".products-checkout-actions");
+    const back = document.getElementById("products-checkout-flow-back");
+    const next = document.querySelector('[data-checkout-action="next"]');
+    const courierCard = document.querySelector(
+      '#products-checkout-flow .products-checkout-delivery label:has(input[value="courier"])',
+    );
+    const readBox = (element) => {
+      if (!(element instanceof HTMLElement)) {
+        return null;
+      }
+      const box = element.getBoundingClientRect();
+      return {
+        left: box.left,
+        right: box.right,
+        top: box.top,
+        bottom: box.bottom,
+        width: box.width,
+        height: box.height,
+      };
+    };
+    return {
+      viewport: window.innerWidth,
+      panel: readBox(panel),
+      form: readBox(form),
+      actions: readBox(actions),
+      back: readBox(back),
+      next: readBox(next),
+      courierCard: readBox(courierCard),
+    };
+  });
+
+  for (const box of [
+    metrics.panel,
+    metrics.form,
+    metrics.actions,
+    metrics.back,
+    metrics.next,
+    metrics.courierCard,
+  ]) {
+    expect(box.left).toBeGreaterThanOrEqual(0);
+    expect(box.right).toBeLessThanOrEqual(metrics.viewport);
+  }
+  expect(Math.abs(metrics.back.top - metrics.next.top)).toBeLessThan(2);
+  expect(metrics.back.height).toBeGreaterThanOrEqual(44);
+  expect(metrics.next.height).toBeGreaterThanOrEqual(44);
 });
 
 test("products widget applies cart payload from text tools", async ({

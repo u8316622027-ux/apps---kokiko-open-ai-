@@ -158,10 +158,19 @@ class WidgetTemplateTests(unittest.TestCase):
             template_text,
         )
 
-    def test_products_template_mobile_toolbar_is_single_row(self) -> None:
+    def test_products_template_mobile_toolbar_stacks_search_below_actions(self) -> None:
         template_text = self._read_products_bundle_text()
         self.assertIn("@media (max-width: 520px)", template_text)
-        self.assertIn("grid-template-columns: 112px minmax(0, 1fr) auto", template_text)
+        self.assertIn('"logo actions"', template_text)
+        self.assertIn('"search search"', template_text)
+        self.assertIn("grid-area: search", template_text)
+
+    def test_agents_rules_require_mobile_first_frontend_work(self) -> None:
+        agents_text = Path("AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("Mobile-first", agents_text)
+        self.assertIn("320px", agents_text)
+        self.assertIn("no horizontal overflow", agents_text)
+        self.assertIn("touch targets", agents_text)
 
 
 if __name__ == "__main__":
