@@ -111,6 +111,53 @@
     }
   });
 
+  const expandCheckoutSelect = (select) => {
+    if (!(select instanceof HTMLSelectElement) || select.options.length < 2) {
+      return;
+    }
+    select.size = Math.min(8, select.options.length);
+    select.dataset.expanded = "true";
+  };
+
+  const collapseCheckoutSelect = (select) => {
+    if (!(select instanceof HTMLSelectElement)) {
+      return;
+    }
+    select.size = 0;
+    delete select.dataset.expanded;
+  };
+
+  checkoutForm?.addEventListener("focusin", (event) => {
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    if (target instanceof HTMLSelectElement) {
+      expandCheckoutSelect(target);
+    }
+  });
+
+  checkoutForm?.addEventListener("pointerdown", (event) => {
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    if (target instanceof HTMLSelectElement) {
+      expandCheckoutSelect(target);
+    }
+  });
+
+  checkoutForm?.addEventListener("focusout", (event) => {
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    if (target instanceof HTMLSelectElement) {
+      window.setTimeout(() => collapseCheckoutSelect(target), 120);
+    }
+  });
+
+  checkoutForm?.addEventListener("keydown", (event) => {
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    if (
+      target instanceof HTMLSelectElement &&
+      (event.key === "Escape" || event.key === "Enter")
+    ) {
+      collapseCheckoutSelect(target);
+    }
+  });
+
   checkoutForm?.addEventListener("change", (event) => {
     const target = event.target instanceof HTMLElement ? event.target : null;
     if (
@@ -138,6 +185,9 @@
       state.checkoutDeliveryWindowIndex = 0;
     }
     ui.renderCheckout();
+    if (target instanceof HTMLSelectElement) {
+      collapseCheckoutSelect(target);
+    }
     if (state.checkoutStep === "address") {
       void actions.refreshCheckoutDeliveryData();
     }

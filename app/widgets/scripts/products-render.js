@@ -53,6 +53,7 @@
       getActiveLanguage,
       normalizeLanguage,
       setActiveLanguage,
+      buildProductUrl,
       debugLog,
     } = utils;
 
@@ -95,6 +96,7 @@
         return {
           address: "Adresă",
           addressAndTime: "Adresă și timp",
+          cancellationDate: "Data anulării:",
           apartment: "Apartament",
           askAvailability: "Verifică disponibilitatea",
           back: "Înapoi",
@@ -104,9 +106,12 @@
           checkoutTitle: "Finalizarea comenzii",
           comment: "Comentariu",
           courier: "Livrare prin curier",
+          courierDescription:
+            "Livrarea în Moldova este efectuată de serviciul nostru de curierat.",
           delivery: "Livrare",
           deliveryMethod: "Alegeți metoda de livrare:",
           deliveryTime: "Alegeți timpul livrării:",
+          deliveryType: "Tip livrare:",
           email: "Email",
           entrance: "Scară",
           floor: "Etaj",
@@ -117,14 +122,31 @@
           next: "Următorul",
           openProduct: "Deschide pagina produsului",
           paymentReview: "Revizuire și plată",
+          noPharmacies: "Nu sunt farmacii în sectorul selectat.",
+          paymentMethodCard: "Cu cardul la primire",
+          paymentMethodCash: "Numerar",
+          paymentMethodCashless: "Transfer bancar",
+          paymentMethodMaib: "Cu cardul online",
+          paymentMethodMia: "Online prin QR cod",
+          paymentMethods: "Alegeți metoda de plată:",
           pharmacy: "Farmacie",
           phone: "Număr de telefon*",
           pickup: "Ridicare personală",
+          pickupDescription: "Livrare gratuită la farmacii în toată țara.",
+          pickupFromStore: "Ridicare din farmacie",
+          preliminaryNotice:
+            "Data și ora sunt preliminare. Așteptați apelul operatorului.",
+          privacyConsent:
+            "Sunt de acord cu termenii și politica de confidențialitate",
           pickupDate: "Data livrării:",
           region: "Regiune*",
+          reviewCustomer: "Datele comenzii",
+          reviewItems: "Lista produselor",
           search: "Caută",
           searchPlaceholder: "Caută produse",
           sector: "Sector*",
+          totalPayment: "Total de plată:",
+          totalProducts: "Costul produselor:",
           street: "Stradă*",
           submitOrder: "Trimite comanda",
           darkTheme: "Tema întunecată",
@@ -134,6 +156,7 @@
       return {
         address: "Адрес",
         addressAndTime: "Адрес и время",
+        cancellationDate: "Дата аннулирования:",
         apartment: "Квартира",
         askAvailability: "Уточнить наличие",
         back: "Назад",
@@ -143,9 +166,12 @@
         checkoutTitle: "Оформление заказа",
         comment: "Комментарий",
         courier: "Курьерская доставка",
+        courierDescription:
+          "Доставка по Молдове осуществляется нашей курьерской службой.",
         delivery: "Доставка",
         deliveryMethod: "Выберите способ доставки:",
         deliveryTime: "Выберите время доставки:",
+        deliveryType: "Тип доставки:",
         email: "Email",
         entrance: "Подъезд",
         floor: "Этаж",
@@ -156,14 +182,31 @@
         next: "Следующий",
         openProduct: "Открыть страницу товара",
         paymentReview: "Обзор и оплата",
+        noPharmacies: "В выбранном секторе нет аптек.",
+        paymentMethodCard: "Картой при получении",
+        paymentMethodCash: "Наличными",
+        paymentMethodCashless: "Перечислением",
+        paymentMethodMaib: "Картой онлайн",
+        paymentMethodMia: "Онлайн по QR коду",
+        paymentMethods: "Выберите способ оплаты:",
         pharmacy: "Аптека",
         phone: "Номер телефона*",
         pickup: "Самовывоз",
+        pickupDescription: "Бесплатная доставка в аптеки по всей стране.",
+        pickupFromStore: "Самовывоз из аптеки",
+        preliminaryNotice:
+          "Дата и время предварительные. Дождитесь звонка оператора.",
+        privacyConsent:
+          "Согласен с пользовательским соглашением / политикой конфиденциальности",
         pickupDate: "Дата доставки:",
         region: "Регион*",
+        reviewCustomer: "Данные заказа",
+        reviewItems: "Список товаров",
         search: "Поиск",
         searchPlaceholder: "Искать по всем категориям",
         sector: "Сектор*",
+        totalPayment: "Итого к оплате:",
+        totalProducts: "Стоимость товаров:",
         street: "Улица*",
         submitOrder: "Отправить заказ",
         darkTheme: "Темная тема",
@@ -186,6 +229,30 @@
 
     const findProduct = (productId) =>
       state.products.find((product) => product.id === productId);
+
+    const getLocalizedProductName = (item) => {
+      const language = getActiveLanguage();
+      const preferred =
+        language === "ro"
+          ? normalizeText(item?.nameRo || item?.name_ro)
+          : normalizeText(item?.nameRu || item?.name_ru);
+      const fallback =
+        language === "ro"
+          ? normalizeText(item?.nameRu || item?.name_ru)
+          : normalizeText(item?.nameRo || item?.name_ro);
+      return preferred || fallback || normalizeText(item?.name) || "";
+    };
+
+    const getLocalizedProductUrl = (item) => {
+      const language = getActiveLanguage();
+      const slug =
+        normalizeText(
+          language === "ro" ? item?.productSlugRo : item?.productSlugRu,
+        ) || normalizeText(item?.productSlug);
+      const rawUrl =
+        normalizeText(item?.rawUrl) || normalizeText(item?.productUrl);
+      return buildProductUrl(rawUrl, slug, language);
+    };
 
     const persistAndRenderCart = () => {
       writeStoredCart();
@@ -226,6 +293,23 @@
       if (labelText instanceof HTMLElement) {
         labelText.textContent = text;
       }
+    };
+
+    const setDeliveryCardDescription = (control, text) => {
+      const label =
+        control instanceof HTMLElement ? control.closest("label") : null;
+      if (!(label instanceof HTMLElement)) {
+        return;
+      }
+      let description = label.querySelector(
+        ".products-checkout-delivery-description",
+      );
+      if (!(description instanceof HTMLElement)) {
+        description = document.createElement("small");
+        description.className = "products-checkout-delivery-description";
+        label.append(description);
+      }
+      description.textContent = text;
     };
 
     const renderStaticCopy = () => {
@@ -292,9 +376,11 @@
       );
       if (courierLabel instanceof HTMLElement) {
         courierLabel.textContent = copy.courier;
+        setDeliveryCardDescription(courierLabel, copy.courierDescription);
       }
       if (pickupLabel instanceof HTMLElement) {
         pickupLabel.textContent = copy.pickup;
+        setDeliveryCardDescription(pickupLabel, copy.pickupDescription);
       }
       setLabelText(checkoutName, copy.name);
       setLabelText(checkoutPhone, copy.phone);
@@ -309,16 +395,48 @@
       setLabelText(checkoutPharmacy, copy.pharmacy);
       setLabelText(checkoutEmail, copy.email);
       setLabelText(checkoutComment, copy.comment);
+      const paymentLegend = checkoutForm?.querySelector(
+        ".products-payment-methods legend",
+      );
+      if (paymentLegend instanceof HTMLElement) {
+        paymentLegend.textContent = copy.paymentMethods;
+      }
+      const paymentLabels = {
+        cash: copy.paymentMethodCash,
+        card: copy.paymentMethodCard,
+        maib: copy.paymentMethodMaib,
+        mia: copy.paymentMethodMia,
+        cashless_individual: copy.paymentMethodCashless,
+      };
+      for (const [value, text] of Object.entries(paymentLabels)) {
+        const label = checkoutForm?.querySelector(
+          `input[name="products-payment-method"][value="${value}"] + span`,
+        );
+        if (label instanceof HTMLElement) {
+          label.textContent = text;
+        }
+      }
+      const consent = checkoutForm?.querySelector(
+        ".products-checkout-consent span",
+      );
+      if (consent instanceof HTMLElement) {
+        consent.textContent = copy.privacyConsent;
+      }
     };
 
     const normalizeCartToolItem = (item) => ({
       id: item.id,
-      name: item.name,
+      name: getLocalizedProductName(item) || item.name,
+      name_ru: item.nameRu,
+      name_ro: item.nameRo,
       manufacturer: item.manufacturer,
       price: item.price,
       quantity: item.quantity,
       image_url: item.imageUrl,
-      product_url: item.productUrl,
+      product_url: getLocalizedProductUrl(item) || item.productUrl,
+      raw_url: item.rawUrl,
+      slug_ru: item.productSlugRu,
+      slug_ro: item.productSlugRo,
     });
 
     const getCartPayload = () => ({
@@ -359,10 +477,16 @@
           return {
             id,
             name,
+            nameRu: normalizeText(item.name_ru || item.nameRu),
+            nameRo: normalizeText(item.name_ro || item.nameRo),
             manufacturer: normalizeText(item.manufacturer),
             price,
             imageUrl: normalizeText(item.image_url || item.imageUrl),
             productUrl: normalizeText(item.product_url || item.productUrl),
+            rawUrl: normalizeText(item.raw_url || item.rawUrl),
+            productSlug: normalizeText(item.slug || item.productSlug),
+            productSlugRu: normalizeText(item.slug_ru || item.productSlugRu),
+            productSlugRo: normalizeText(item.slug_ro || item.productSlugRo),
             quantity,
           };
         })
@@ -370,12 +494,25 @@
       persistAndRenderCart();
     };
 
-    const callCartTool = async (name, args) => {
+    const nextCartMutationSerial = () => {
+      state.cartMutationSerial = Number(state.cartMutationSerial || 0) + 1;
+      return state.cartMutationSerial;
+    };
+
+    const callCartTool = async (name, args, mutationSerial) => {
       if (typeof window.openai?.callTool !== "function") {
         return;
       }
       try {
         const toolResult = await window.openai.callTool(name, args);
+        if (mutationSerial !== state.cartMutationSerial) {
+          debugLog("cart_tool_stale_response_ignored", {
+            tool: name,
+            mutationSerial,
+            currentMutationSerial: state.cartMutationSerial,
+          });
+          return;
+        }
         applyCartToolResult(toolResult);
       } catch (error) {
         debugLog("cart_tool_error", {
@@ -760,19 +897,20 @@
       );
       state.checkoutDeliveryWindowIndex = selectedIndex;
       if (getDeliveryMethod() === "pickup") {
+        const copy = getUiCopy();
         const windowItem = windows[selectedIndex];
         const cancelDate = normalizeText(windowItem.orderEnd);
         const pickupTime =
           normalizeText(windowItem.to) || normalizeText(windowItem.from);
         checkoutDeliveryWindows.innerHTML = `
           <div class="products-pickup-window-card">
-            <p><span>${escapeHtml(getUiCopy().pickupDate)}</span><strong>${escapeHtml(windowItem.deliveryDate)} • ${escapeHtml(pickupTime)}</strong></p>
+            <p><span>${escapeHtml(copy.pickupDate)}</span><strong>${escapeHtml(windowItem.deliveryDate)} • ${escapeHtml(pickupTime)}</strong></p>
             ${
               cancelDate
-                ? `<p><span>Дата аннулирования:</span><strong class="products-pickup-window-card__danger">${escapeHtml(cancelDate)} • ${escapeHtml(pickupTime)}</strong></p>`
+                ? `<p><span>${escapeHtml(copy.cancellationDate)}</span><strong class="products-pickup-window-card__danger">${escapeHtml(cancelDate)} • ${escapeHtml(pickupTime)}</strong></p>`
                 : ""
             }
-            <small>${escapeHtml(getActiveLanguage() === "ro" ? "Data și ora sunt preliminare. Așteptați apelul operatorului." : "Дата и время предварительные. Дождитесь звонка оператора.")}</small>
+            <small>${escapeHtml(copy.preliminaryNotice)}</small>
           </div>
         `;
         return;
@@ -871,8 +1009,7 @@
         return;
       }
       if (!pharmacies.length) {
-        checkoutPharmacyOptions.innerHTML =
-          '<p class="products-delivery-window-empty">В выбранном секторе нет аптек.</p>';
+        checkoutPharmacyOptions.innerHTML = `<p class="products-delivery-window-empty">${escapeHtml(getUiCopy().noPharmacies)}</p>`;
         return;
       }
       checkoutPharmacyOptions.innerHTML = pharmacies
@@ -944,6 +1081,23 @@
         renderPickupOptions();
       }
       renderDeliveryWindows();
+    };
+
+    const resetCheckoutLookupsForLanguage = () => {
+      state.checkoutLookupsLoaded = false;
+      state.checkoutLookupsLoading = false;
+      state.checkoutRegions = [];
+      state.checkoutPharmacies = [];
+      state.checkoutSectorCache = {};
+      state.checkoutTargetCache = {};
+      state.checkoutPickupCache = {};
+      state.checkoutDeliveryWindows = [];
+      state.checkoutDeliveryWindowIndex = 0;
+      for (const select of [checkoutRegion, checkoutSector, checkoutPharmacy]) {
+        if (select instanceof HTMLSelectElement) {
+          select.dataset.optionsSignature = "";
+        }
+      }
     };
 
     const ensureCheckoutLookups = async () => {
@@ -1089,10 +1243,17 @@
       if (!normalized) {
         return;
       }
+      resetCheckoutLookupsForLanguage();
       renderStaticCopy();
       renderProducts();
       renderCart();
       renderCheckout();
+      if (state.cartOpen && state.checkoutOpen) {
+        void ensureCheckoutLookups().then(() => refreshCheckoutDeliveryData());
+      }
+      if (state.lastQuery && typeof window.openai?.callTool === "function") {
+        void ctx.actions.searchProducts(state.lastQuery);
+      }
       debugLog("language_applied", { language: normalized });
     };
 
@@ -1280,10 +1441,10 @@
       total: getCartTotal(),
       items: state.cartItems.map((item) => ({
         id: item.id,
-        name: item.name,
+        name: getLocalizedProductName(item) || item.name,
         price: item.price,
         quantity: item.quantity,
-        product_url: item.productUrl,
+        product_url: getLocalizedProductUrl(item) || item.productUrl,
       })),
     });
 
@@ -1379,36 +1540,59 @@
       const previousCart = getCartPayload();
       const productPayload = {
         id: product.id,
-        name: product.name,
+        name: getLocalizedProductName(product),
+        name_ru: product.nameRu,
+        name_ro: product.nameRo,
         manufacturer: product.manufacturer,
         price,
         image_url: product.imageUrl,
-        product_url: product.productUrl,
+        product_url: getLocalizedProductUrl(product),
+        raw_url: product.rawUrl,
+        slug_ru: product.productSlugRu,
+        slug_ro: product.productSlugRo,
         quantity: 1,
       };
       const existing = findCartItem(product.id);
       if (existing) {
         existing.quantity = Math.min(99, existing.quantity + 1);
+        existing.name = getLocalizedProductName(product);
+        existing.nameRu = product.nameRu;
+        existing.nameRo = product.nameRo;
+        existing.productUrl = getLocalizedProductUrl(product);
+        existing.rawUrl = product.rawUrl;
+        existing.productSlugRu = product.productSlugRu;
+        existing.productSlugRo = product.productSlugRo;
       } else {
         state.cartItems.push({
           id: product.id,
-          name: product.name,
+          name: getLocalizedProductName(product),
+          nameRu: product.nameRu,
+          nameRo: product.nameRo,
           manufacturer: product.manufacturer,
           price,
           imageUrl: product.imageUrl,
-          productUrl: product.productUrl,
+          productUrl: getLocalizedProductUrl(product),
+          rawUrl: product.rawUrl,
+          productSlug: product.productSlug,
+          productSlugRu: product.productSlugRu,
+          productSlugRo: product.productSlugRo,
           quantity: 1,
         });
       }
       state.orderSubmitted = false;
       debugLog("cart_add", { productId: product.id });
       persistAndRenderCart();
-      void callCartTool("add_to_cart", {
-        cart: previousCart,
-        product: productPayload,
-        quantity: 1,
-        language: getActiveLanguage(),
-      });
+      const mutationSerial = nextCartMutationSerial();
+      void callCartTool(
+        "add_to_cart",
+        {
+          cart: previousCart,
+          product: productPayload,
+          quantity: 1,
+          language: getActiveLanguage(),
+        },
+        mutationSerial,
+      );
     };
 
     const changeCartQuantity = (productId, delta) => {
@@ -1426,12 +1610,17 @@
         quantity: nextQuantity,
       });
       persistAndRenderCart();
-      void callCartTool("update_cart_item", {
-        cart: getCartPayload(),
-        product_id: cartItem.id,
-        quantity: nextQuantity,
-        language: getActiveLanguage(),
-      });
+      const mutationSerial = nextCartMutationSerial();
+      void callCartTool(
+        "update_cart_item",
+        {
+          cart: getCartPayload(),
+          product_id: cartItem.id,
+          quantity: nextQuantity,
+          language: getActiveLanguage(),
+        },
+        mutationSerial,
+      );
     };
 
     const removeFromCart = (productId) => {
@@ -1441,11 +1630,16 @@
       );
       debugLog("cart_remove", { productId: normalizedProductId });
       persistAndRenderCart();
-      void callCartTool("remove_from_cart", {
-        cart: getCartPayload(),
-        product_id: normalizedProductId,
-        language: getActiveLanguage(),
-      });
+      const mutationSerial = nextCartMutationSerial();
+      void callCartTool(
+        "remove_from_cart",
+        {
+          cart: getCartPayload(),
+          product_id: normalizedProductId,
+          language: getActiveLanguage(),
+        },
+        mutationSerial,
+      );
     };
 
     const renderCart = () => {
@@ -1498,11 +1692,12 @@
       cartItems.innerHTML = state.cartItems
         .map((item) => {
           const safeId = escapeHtml(item.id);
-          const safeName = escapeHtml(item.name);
+          const itemName = getLocalizedProductName(item) || item.name;
+          const safeName = escapeHtml(itemName);
           const safeManufacturer = escapeHtml(item.manufacturer);
           const safeImageUrl = escapeHtml(item.imageUrl || getFallbackImage());
           const safeProductUrl = escapeHtml(
-            normalizeText(item.productUrl) || "https://www.kokiko.md/",
+            getLocalizedProductUrl(item) || "https://www.kokiko.md/",
           );
           return `
             <article class="products-cart-item" data-product-id="${safeId}">
@@ -1543,26 +1738,26 @@
       if (!(checkoutReview instanceof HTMLElement)) {
         return;
       }
+      const copy = getUiCopy();
       const payload = buildOrderPayload();
       const deliveryLabel =
-        payload.delivery_method === "courier"
-          ? "Курьерская доставка"
-          : "Самовывоз";
+        payload.delivery_method === "courier" ? copy.courier : copy.pickup;
       const addressLabel =
         payload.delivery_method === "courier"
           ? payload.address || "-"
-          : "Магазин косметики КоКиКо, ул. А. Руссо, 1";
+          : copy.pickupFromStore;
       const deliveryWindow = payload.delivery_window
         ? `${payload.delivery_window.date} • ${payload.delivery_window.time}`
         : payload.delivery_method === "pickup"
-          ? "Самовывоз из магазина"
+          ? copy.pickupFromStore
           : "-";
       const itemsHtml = state.cartItems
         .map((item) => {
           const lineTotal = toMoney(item.price * item.quantity);
+          const itemName = getLocalizedProductName(item) || item.name;
           return `
             <li>
-              <span>${escapeHtml(item.name)}</span>
+              <span>${escapeHtml(itemName)}</span>
               <strong>${toMoney(item.price)} x ${item.quantity} = ${lineTotal}</strong>
             </li>
           `;
@@ -1570,19 +1765,19 @@
         .join("");
       checkoutReview.innerHTML = `
         <div class="products-checkout-review-card">
-          <h4>Список товаров</h4>
+          <h4>${escapeHtml(copy.reviewItems)}</h4>
           <ul>${itemsHtml}</ul>
-          <p><span>Стоимость товаров:</span><strong>${toMoney(getCartTotal())}</strong></p>
-          <p><span>Итого к оплате:</span><strong>${toMoney(getCartTotal())}</strong></p>
+          <p><span>${escapeHtml(copy.totalProducts)}</span><strong>${toMoney(getCartTotal())}</strong></p>
+          <p><span>${escapeHtml(copy.totalPayment)}</span><strong>${toMoney(getCartTotal())}</strong></p>
         </div>
         <div class="products-checkout-review-card">
-          <h4>Данные заказа</h4>
-          <p><span>Имя:</span><strong>${escapeHtml(payload.customer_name || "-")}</strong></p>
-          <p><span>Телефон:</span><strong>${escapeHtml(payload.customer_phone || "-")}</strong></p>
-          <p><span>Тип доставки:</span><strong>${escapeHtml(deliveryLabel)}</strong></p>
-          <p><span>Адрес доставки:</span><strong>${escapeHtml(addressLabel)}</strong></p>
-          <p><span>Дата доставки:</span><strong>${escapeHtml(deliveryWindow)}</strong></p>
-          <p><span>Комментарий:</span><strong>${escapeHtml(payload.comment || "-")}</strong></p>
+          <h4>${escapeHtml(copy.reviewCustomer)}</h4>
+          <p><span>${escapeHtml(copy.name)}</span><strong>${escapeHtml(payload.customer_name || "-")}</strong></p>
+          <p><span>${escapeHtml(copy.phone)}</span><strong>${escapeHtml(payload.customer_phone || "-")}</strong></p>
+          <p><span>${escapeHtml(copy.deliveryType)}</span><strong>${escapeHtml(deliveryLabel)}</strong></p>
+          <p><span>${escapeHtml(copy.address)}</span><strong>${escapeHtml(addressLabel)}</strong></p>
+          <p><span>${escapeHtml(copy.pickupDate)}</span><strong>${escapeHtml(deliveryWindow)}</strong></p>
+          <p><span>${escapeHtml(copy.comment)}</span><strong>${escapeHtml(payload.comment || "-")}</strong></p>
         </div>
       `;
     };
@@ -1813,12 +2008,14 @@
             ? `<p class="new-price">${toMoney(effectivePrice)}</p>`
             : `<p class="new-price is-unavailable">${escapeHtml(getUiCopy().unavailable)}</p>`;
           const safeImageUrl = escapeHtml(product.imageUrl);
-          const safeName = escapeHtml(product.name);
+          const safeName = escapeHtml(
+            getLocalizedProductName(product) || product.name,
+          );
           const safeManufacturer = escapeHtml(product.manufacturer);
           const safeFallbackImage = escapeHtml(getFallbackImage());
           const safeProductId = escapeHtml(product.id);
           const safeProductUrl = escapeHtml(
-            normalizeText(product.productUrl) || "https://www.kokiko.md/",
+            getLocalizedProductUrl(product) || "https://www.kokiko.md/",
           );
           const copy = getCartCopy();
           const actionButton = inStock

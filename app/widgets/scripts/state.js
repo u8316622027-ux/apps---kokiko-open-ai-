@@ -12,6 +12,7 @@
       isLoading: true,
       products: [],
       cartItems: [],
+      cartMutationSerial: 0,
       cartOpen: false,
       checkoutOpen: false,
       checkoutStep: "delivery",
@@ -390,12 +391,12 @@
           : {};
       const preferredLanguage = getActiveLanguage(item.language);
       const fallbackLanguage = preferredLanguage === "ru" ? "ro" : "ru";
+      const nameRu = normalizeText(item.name_ru) || normalizeText(ru.name);
+      const nameRo = normalizeText(item.name_ro) || normalizeText(ro.name);
       const namePreferred =
-        normalizeText(item[`name_${preferredLanguage}`]) ||
-        normalizeText(preferredLanguage === "ru" ? ru.name : ro.name);
+        preferredLanguage === "ru" ? nameRu || nameRo : nameRo || nameRu;
       const nameFallback =
-        normalizeText(item[`name_${fallbackLanguage}`]) ||
-        normalizeText(fallbackLanguage === "ru" ? ru.name : ro.name);
+        fallbackLanguage === "ru" ? nameRu || nameRo : nameRo || nameRu;
       const name =
         namePreferred || nameFallback || normalizeText(item.name) || "?????";
       const manufacturer =
@@ -508,9 +509,16 @@
         itemTranslations[fallbackLang]
           ? itemTranslations[fallbackLang]
           : {};
-      const slug =
+      const slugRu =
         normalizeText(item.slug_ru) ||
+        normalizeText(metaTranslations.ru?.slug) ||
+        normalizeText(itemTranslations.ru?.slug);
+      const slugRo =
         normalizeText(item.slug_ro) ||
+        normalizeText(metaTranslations.ro?.slug) ||
+        normalizeText(itemTranslations.ro?.slug);
+      const slug =
+        (preferredLanguage === "ru" ? slugRu || slugRo : slugRo || slugRu) ||
         normalizeText(metaTranslationLang.slug) ||
         normalizeText(metaTranslationFallback.slug) ||
         normalizeText(translationLang.slug) ||
@@ -528,11 +536,16 @@
       return {
         id: productId,
         name,
+        nameRu,
+        nameRo,
         manufacturer,
         price: Number.isNaN(price) ? null : price,
         discountPrice: Number.isNaN(discountPrice) ? null : discountPrice,
         imageUrl,
         productSlug: slug,
+        productSlugRu: slugRu,
+        productSlugRo: slugRo,
+        rawUrl,
         productUrl: buildProductUrl(rawUrl, slug, preferredLanguage),
       };
     };
@@ -558,10 +571,16 @@
       return {
         id,
         name,
+        nameRu: normalizeText(item.nameRu || item.name_ru),
+        nameRo: normalizeText(item.nameRo || item.name_ro),
         manufacturer: normalizeText(item.manufacturer),
         price,
         imageUrl: normalizeText(item.imageUrl) || getFallbackImage(),
         productUrl: normalizeText(item.productUrl) || getSiteBaseUrl(),
+        rawUrl: normalizeText(item.rawUrl || item.raw_url),
+        productSlug: normalizeText(item.productSlug || item.slug),
+        productSlugRu: normalizeText(item.productSlugRu || item.slug_ru),
+        productSlugRo: normalizeText(item.productSlugRo || item.slug_ro),
         quantity: normalizeCartQuantity(item.quantity),
       };
     };

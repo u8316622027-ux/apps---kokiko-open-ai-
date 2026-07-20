@@ -287,13 +287,17 @@
         const language = normalizeLanguage(payload.language);
         if (language) {
           const action = normalizeText(payload.action).toLowerCase();
-          setActiveLanguage(language, {
-            persist: [
-              "open_checkout",
-              "set_widget_language",
-              "set_widget_theme",
-            ].includes(action),
-          });
+          if (typeof ctx.actions.setLanguage === "function") {
+            ctx.actions.setLanguage(language);
+          } else {
+            setActiveLanguage(language, {
+              persist: [
+                "open_checkout",
+                "set_widget_language",
+                "set_widget_theme",
+              ].includes(action),
+            });
+          }
         }
         theme.updateFromPayload(payload);
         ctx.ui.renderProducts();

@@ -66,7 +66,11 @@ class WidgetTemplateTests(unittest.TestCase):
         template_text = self._read_products_bundle_text()
         self.assertIn('const getSiteBaseUrl = () => "https://www.kokiko.md";', template_text)
         self.assertIn(
-            'normalizeText(product.productUrl) || "https://www.kokiko.md/"',
+            "const getLocalizedProductUrl = (item) =>",
+            template_text,
+        )
+        self.assertIn(
+            "return buildProductUrl(rawUrl, slug, language);",
             template_text,
         )
 

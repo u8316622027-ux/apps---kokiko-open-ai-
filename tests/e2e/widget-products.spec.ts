@@ -150,6 +150,118 @@ test("products widget syncs cart actions through cart tools", async ({
   expect(calls[2].args.cart.token).toBe("cart-token-123");
 });
 
+test("products widget ignores stale cart add confirmations", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.__KOKIKO_CART_RESOLVERS__ = [];
+    window.openai = {
+      callTool: async (name, args) =>
+        new Promise((resolve) => {
+          const items = Array.isArray(args?.cart?.items) ? args.cart.items : [];
+          const product = args?.product
+            ? {
+                ...args.product,
+                quantity: args.quantity || args.product.quantity || 1,
+              }
+            : null;
+          const nextItems =
+            name === "add_to_cart" && product ? items.concat(product) : items;
+          window.__KOKIKO_CART_RESOLVERS__.push({
+            name,
+            resolve: () =>
+              resolve({
+                structuredContent: {
+                  cart: {
+                    token: `cart-token-${nextItems.length}`,
+                    synced: true,
+                    items: nextItems,
+                  },
+                },
+              }),
+          });
+        }),
+    };
+  });
+  await openWidgetWithProduct(page);
+
+  const addButton = page.locator('[data-action="add-to-cart"]');
+  await addButton.click();
+  await addButton.click();
+  await addButton.click();
+  await expect(page.locator("#products-cart-button")).toContainText("3");
+
+  await page.evaluate(() => window.__KOKIKO_CART_RESOLVERS__[0].resolve());
+  await page.waitForTimeout(80);
+  await expect(page.locator("#products-cart-button")).toContainText("3");
+
+  await page.evaluate(() => window.__KOKIKO_CART_RESOLVERS__[2].resolve());
+  await page.waitForTimeout(80);
+  await expect(page.locator("#products-cart-button")).toContainText("3");
+});
+
+test("products widget does not resurrect removed items from stale add response", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.__KOKIKO_CART_RESOLVERS__ = [];
+    window.openai = {
+      callTool: async (name, args) =>
+        new Promise((resolve) => {
+          const items = Array.isArray(args?.cart?.items) ? args.cart.items : [];
+          const product = args?.product
+            ? {
+                ...args.product,
+                quantity: args.quantity || args.product.quantity || 1,
+              }
+            : null;
+          const nextItems =
+            name === "add_to_cart" && product
+              ? items.concat(product)
+              : name === "remove_from_cart"
+                ? items.filter((item) => item.id !== args.product_id)
+                : items;
+          window.__KOKIKO_CART_RESOLVERS__.push({
+            name,
+            resolve: () =>
+              resolve({
+                structuredContent: {
+                  cart: {
+                    token: `cart-token-${name}`,
+                    synced: true,
+                    items: nextItems,
+                  },
+                },
+              }),
+          });
+        }),
+    };
+  });
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.getByRole("button", { name: /remove/i }).click();
+  await expect(page.locator("#products-cart-button")).toContainText("0");
+
+  await page.evaluate(() =>
+    window.__KOKIKO_CART_RESOLVERS__
+      .find((resolver) => resolver.name === "remove_from_cart")
+      .resolve(),
+  );
+  await page.evaluate(() =>
+    window.__KOKIKO_CART_RESOLVERS__
+      .find((resolver) => resolver.name === "add_to_cart")
+      .resolve(),
+  );
+  await page.waitForTimeout(80);
+
+  await expect(page.locator("#products-cart-button")).toContainText("0");
+  await expect(page.locator("#products-cart-items")).toContainText(
+    /Cart is empty|Корзина пуста|Coșul este gol/,
+  );
+});
+
 test("products cart keeps checkout out of the cart list scroll", async ({
   page,
 }) => {
@@ -266,6 +378,292 @@ test("products widget keeps manually selected language after reload", async ({
     "placeholder",
     "Caută produse",
   );
+});
+
+test("products widget relocalizes products and checkout lookups when language changes", async ({
+  page,
+}) => {
+  const htmlPath = path.resolve(process.cwd(), "app/widgets/products.html");
+  const htmlUrl = `file:///${htmlPath.replace(/\\/g, "/")}`;
+
+  await page.addInitScript(() => {
+    window.localStorage.clear();
+    window.__KOKIKO_FETCH_CALLS__ = [];
+    window.fetch = async (url, options) => {
+      window.__KOKIKO_FETCH_CALLS__.push({
+        url: String(url),
+        language: options?.headers?.["Accept-Language"],
+      });
+      if (String(url).endsWith("/regions")) {
+        return {
+          ok: true,
+          json: async () => [
+            {
+              id: 2,
+              translations: {
+                ru: { name: "г. Кишинёв" },
+                ro: { name: "mun. Chișinău" },
+              },
+            },
+          ],
+        };
+      }
+      if (String(url).endsWith("/pharmacies/list")) {
+        return {
+          ok: true,
+          json: async () => [
+            {
+              id: 36,
+              translations: {
+                ru: { name: "Аптека", address: "ул. Руссо, 1" },
+                ro: { name: "Farmacie", address: "str. Russo, 1" },
+              },
+              region: {
+                id: 2,
+                translations: {
+                  ru: { name: "г. Кишинёв" },
+                  ro: { name: "mun. Chișinău" },
+                },
+              },
+              sector: {
+                id: 20,
+                translations: {
+                  ru: { name: "Рышкановка" },
+                  ro: { name: "Rîșcani" },
+                },
+              },
+            },
+          ],
+        };
+      }
+      if (String(url).endsWith("/delivery/calculate/pick-up/36")) {
+        return {
+          ok: true,
+          json: async () => ({
+            deliveryDate: "20.07.2026",
+            from: "14:00",
+            to: "20:00",
+          }),
+        };
+      }
+      return { ok: true, json: async () => ({}) };
+    };
+    window.__APTEKA_WIDGET_PAYLOAD__ = {
+      language: "ro",
+      query: "crema",
+      products: [
+        {
+          id: "cream-1",
+          name_ru: "Крем для лица",
+          name_ro: "Cremă de față",
+          manufacturer: "Kokiko",
+          price: 120,
+          discount_price: 99,
+          image: "",
+          slug_ru: "krem-dlya-litsa",
+          slug_ro: "crema-de-fata",
+        },
+      ],
+    };
+  });
+
+  await page.goto(htmlUrl, { waitUntil: "domcontentloaded" });
+  await expect(page.locator(".product-title")).toContainText("Cremă de față");
+
+  await page.locator("#products-language-toggle").click();
+  await expect(page.locator(".product-title")).toContainText("Крем для лица");
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+  await page.locator('#products-checkout-flow input[value="pickup"]').check();
+  await page.locator('[data-checkout-action="next"]').click();
+
+  await expect(page.locator("#products-checkout-flow-region")).toContainText(
+    "г. Кишинёв",
+  );
+  await expect(page.locator("#products-checkout-flow-sector")).toContainText(
+    "Рышкановка",
+  );
+  const calls = await page.evaluate(() => window.__KOKIKO_FETCH_CALLS__);
+  expect(calls.some((call) => call.language === "ru")).toBeTruthy();
+});
+
+test("products checkout is dark themed beyond the search cards", async ({
+  page,
+}) => {
+  const htmlPath = path.resolve(process.cwd(), "app/widgets/products.html");
+  const htmlUrl = `file:///${htmlPath.replace(/\\/g, "/")}`;
+
+  await page.addInitScript(() => {
+    window.localStorage.clear();
+    window.__APTEKA_WIDGET_PAYLOAD__ = {
+      theme: "dark",
+      theme_mode: "manual",
+      language: "ru",
+      query: "cream",
+      products: [
+        {
+          id: "cream-1",
+          name_ru: "Крем",
+          manufacturer: "Kokiko",
+          price: 120,
+          discount_price: 99,
+          image: "",
+        },
+      ],
+    };
+  });
+
+  await page.goto(htmlUrl, { waitUntil: "domcontentloaded" });
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+
+  const colors = await page.locator("#products-cart-panel").evaluate(() => {
+    const panel = document.getElementById("products-cart-panel");
+    const form = document.getElementById("products-checkout-flow");
+    const field = document.getElementById("products-checkout-flow-name");
+    return {
+      panel: getComputedStyle(panel).backgroundColor,
+      form: getComputedStyle(form).backgroundColor,
+      field: getComputedStyle(field).backgroundColor,
+    };
+  });
+  expect(colors.panel).not.toBe("rgb(255, 255, 255)");
+  expect(colors.form).not.toBe("rgb(255, 255, 255)");
+  expect(colors.field).not.toBe("rgb(255, 255, 255)");
+});
+
+test("products checkout delivery step matches Kokiko card mechanics", async ({
+  page,
+}) => {
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+
+  const courierCard = page.locator(
+    '#products-checkout-flow .products-checkout-delivery label:has(input[value="courier"])',
+  );
+  await expect(courierCard).toContainText("Курьерская доставка");
+  await expect(courierCard).toContainText("Доставка по Молдове");
+  const cardStyle = await courierCard.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      borderWidth: style.borderTopWidth,
+      borderColor: style.borderTopColor,
+      minHeight: style.minHeight,
+    };
+  });
+  expect(cardStyle.borderWidth).toBe("2px");
+  expect(cardStyle.borderColor).toBe("rgb(0, 169, 157)");
+  expect(Number.parseFloat(cardStyle.minHeight)).toBeLessThanOrEqual(112);
+});
+
+test("products checkout keeps expanded selects inside the app panel", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.fetch = async (url) => {
+      if (String(url).endsWith("/regions")) {
+        return {
+          ok: true,
+          json: async () =>
+            Array.from({ length: 14 }, (_, index) => ({
+              id: index + 1,
+              translations: { ru: { name: `Регион ${index + 1}` } },
+            })),
+        };
+      }
+      if (String(url).endsWith("/pharmacies/list")) {
+        return { ok: true, json: async () => [] };
+      }
+      return { ok: true, json: async () => ({}) };
+    };
+  });
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+  await page.locator('[data-checkout-action="next"]').click();
+  await page.locator("#products-checkout-flow-region").focus();
+
+  await expect(page.locator("#products-checkout-flow-region")).toHaveJSProperty(
+    "size",
+    8,
+  );
+  const boxes = await page.evaluate(() => {
+    const panel = document.getElementById("products-cart-panel");
+    const select = document.getElementById("products-checkout-flow-region");
+    const panelBox = panel.getBoundingClientRect();
+    const selectBox = select.getBoundingClientRect();
+    return { panelBottom: panelBox.bottom, selectBottom: selectBox.bottom };
+  });
+  expect(boxes.selectBottom).toBeLessThanOrEqual(boxes.panelBottom);
+});
+
+test("products checkout courier time slots stay compact in the modal", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.fetch = async (url) => {
+      if (String(url).endsWith("/regions")) {
+        return {
+          ok: true,
+          json: async () => [
+            { id: 2, translations: { ru: { name: "г. Кишинёв" } } },
+          ],
+        };
+      }
+      if (String(url).endsWith("/pharmacies/list")) {
+        return { ok: true, json: async () => [] };
+      }
+      if (String(url).endsWith("/cities-by-region/2")) {
+        return {
+          ok: true,
+          json: async () => [
+            { id: 20, translations: { ru: { name: "Центр" } } },
+          ],
+        };
+      }
+      if (String(url).endsWith("/delivery/calculate/target/2")) {
+        return {
+          ok: true,
+          json: async () => ({
+            availableWindows: {
+              "20.07.2026": [
+                { deliveryDate: "20.07.2026", from: "17:00", to: "20:00" },
+                { deliveryDate: "20.07.2026", from: "20:00", to: "22:30" },
+                { deliveryDate: "20.07.2026", from: "22:00", to: "23:30" },
+              ],
+              "21.07.2026": [
+                { deliveryDate: "21.07.2026", from: "09:30", to: "14:00" },
+                { deliveryDate: "21.07.2026", from: "14:00", to: "18:00" },
+              ],
+              "22.07.2026": [
+                { deliveryDate: "22.07.2026", from: "09:30", to: "13:00" },
+              ],
+            },
+          }),
+        };
+      }
+      return { ok: true, json: async () => ({}) };
+    };
+  });
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+  await page.locator('#products-checkout-flow input[value="courier"]').check();
+  await page.locator('[data-checkout-action="next"]').click();
+
+  const firstSlot = page.locator(".products-delivery-window-slot").first();
+  await expect(firstSlot).toBeVisible();
+  const box = await firstSlot.boundingBox();
+  expect(box?.width).toBeLessThan(190);
 });
 
 test("products checkout loads courier regions sectors and delivery windows from Kokiko API", async ({
@@ -518,6 +916,7 @@ test("products checkout filters pickup pharmacies by region and sector and loads
   await page.locator('[data-action="add-to-cart"]').click();
   await page.locator("#products-cart-button").click();
   await page.locator("#products-cart-checkout").click();
+  await page.locator('#products-checkout-flow input[value="pickup"]').check();
   await page.locator('[data-checkout-action="next"]').click();
 
   await expect(

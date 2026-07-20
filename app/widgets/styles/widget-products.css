@@ -3,6 +3,11 @@
   --kokiko-bg-toolbar: #1d2129;
   --kokiko-bg-card: #ffffff;
   --kokiko-bg-card-media: #f6f7fa;
+  --kokiko-bg-panel: #ffffff;
+  --kokiko-bg-field: #ffffff;
+  --kokiko-bg-subtle: #f8faff;
+  --kokiko-bg-selected: #effffb;
+  --kokiko-bg-muted-button: #eef4ff;
   --kokiko-bg-input: #112a62;
   --kokiko-bg-accent: #2b57d8;
   --kokiko-bg-accent-hover: #2148bd;
@@ -13,6 +18,7 @@
   --kokiko-text-on-accent: #ffffff;
   --kokiko-border-soft: #e6ecf8;
   --kokiko-border-strong: #2c4f9a;
+  --kokiko-border-control: #c5cdd2;
   --kokiko-sale: #ef3340;
   --kokiko-logo-mint: #64e3d5;
   --kokiko-shadow-card: 0 10px 28px rgba(21, 35, 70, 0.16);
@@ -27,18 +33,24 @@
 :root[data-theme="dark"] {
   --kokiko-bg-page: #12161f;
   --kokiko-bg-toolbar: #1a1f28;
-  --kokiko-bg-card: #fdfefe;
-  --kokiko-bg-card-media: #f1f4f9;
+  --kokiko-bg-card: #1a2230;
+  --kokiko-bg-card-media: #232d3d;
+  --kokiko-bg-panel: #151c28;
+  --kokiko-bg-field: #101722;
+  --kokiko-bg-subtle: #101722;
+  --kokiko-bg-selected: #123a3a;
+  --kokiko-bg-muted-button: #223049;
   --kokiko-bg-input: #0d2b66;
   --kokiko-bg-accent: #2c57d8;
   --kokiko-bg-accent-hover: #2248bd;
   --kokiko-bg-overlay: rgba(2, 6, 12, 0.48);
-  --kokiko-text-main: #183066;
-  --kokiko-text-secondary: #5d6f98;
+  --kokiko-text-main: #e8f1ff;
+  --kokiko-text-secondary: #a9b8d5;
   --kokiko-text-on-dark: #f3f7ff;
   --kokiko-text-on-accent: #ffffff;
-  --kokiko-border-soft: #dfe7f7;
-  --kokiko-border-strong: #355aa7;
+  --kokiko-border-soft: #29364b;
+  --kokiko-border-strong: #5d7ed0;
+  --kokiko-border-control: #526074;
   --kokiko-sale: #ef3340;
   --kokiko-shadow-card: 0 12px 30px rgba(1, 7, 22, 0.42);
   --kokiko-shadow-toolbar: 0 14px 30px rgba(0, 0, 0, 0.3);
@@ -558,7 +570,7 @@ body {
 
 .add-to-cart-button--ghost {
   border: 1px solid var(--kokiko-bg-accent);
-  background: #ffffff;
+  background: var(--kokiko-bg-card);
   color: var(--kokiko-bg-accent);
 }
 
@@ -582,8 +594,8 @@ body {
   width: min(720px, calc(100vw - 24px));
   max-height: min(680px, calc(100vh - 24px));
   border-radius: 14px;
-  border: 1px solid #d8e3fb;
-  background: #ffffff;
+  border: 1px solid var(--kokiko-border-soft);
+  background: var(--kokiko-bg-panel);
   color: var(--kokiko-text-main);
   box-shadow: 0 20px 44px rgba(12, 26, 56, 0.24);
   display: flex;
@@ -626,7 +638,7 @@ body {
   height: 34px;
   border: none;
   border-radius: 999px;
-  background: #eef4ff;
+  background: var(--kokiko-bg-muted-button);
   color: #38599b;
   font-size: 26px;
   line-height: 1;
@@ -741,7 +753,7 @@ body {
   height: 30px;
   border-radius: 8px;
   border: 1px solid #d5e1f5;
-  background: #f6f9ff;
+  background: var(--kokiko-bg-muted-button);
   color: #2c57d8;
   font-size: 16px;
   font-weight: 800;
@@ -765,7 +777,7 @@ body {
 .products-cart-footer {
   padding: 14px 18px 18px;
   border-top: 1px solid var(--kokiko-border-soft);
-  background: #f8faff;
+  background: var(--kokiko-bg-subtle);
   position: sticky;
   bottom: 0;
   z-index: 1;
@@ -777,7 +789,7 @@ body {
 
 .products-checkout-form {
   padding: 16px 18px 18px;
-  background: #ffffff;
+  background: var(--kokiko-bg-panel);
   display: grid;
   gap: 14px;
   overflow-y: auto;
@@ -872,9 +884,9 @@ body {
 .products-checkout-field select {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid #bfc7ce;
+  border: 1px solid var(--kokiko-border-control);
   border-radius: 4px;
-  background: #ffffff;
+  background: var(--kokiko-bg-field);
   color: var(--kokiko-text-main);
   padding: 10px 12px;
   font: inherit;
@@ -886,6 +898,13 @@ body {
   resize: vertical;
   min-height: 42px;
   max-height: 92px;
+}
+
+.products-checkout-field select[data-expanded="true"] {
+  max-height: 230px;
+  overflow-y: auto;
+  position: relative;
+  z-index: 3;
 }
 
 .products-pharmacy-select {
@@ -902,10 +921,10 @@ body {
   grid-template-columns: auto minmax(0, 1fr);
   gap: 6px 10px;
   align-items: start;
-  border: 1px solid #c5cdd2;
+  border: 1px solid var(--kokiko-border-control);
   border-radius: 14px;
   padding: 12px 14px;
-  background: #ffffff;
+  background: var(--kokiko-bg-panel);
   color: var(--kokiko-text-main);
   cursor: pointer;
 }
@@ -958,30 +977,48 @@ body {
   padding: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 22px;
 }
 
 .products-checkout-delivery legend {
   grid-column: 1 / -1;
-  margin-bottom: 5px;
+  margin-bottom: 10px;
 }
 
 .products-checkout-delivery label {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 78px;
-  padding: 14px 16px;
-  border-radius: 14px;
-  border: 1px solid #c5cdd2;
-  background: #ffffff;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px 10px;
+  min-height: 94px;
+  padding: 18px 20px;
+  border-radius: 18px;
+  border: 2px solid var(--kokiko-border-control);
+  background: var(--kokiko-bg-panel);
   color: var(--kokiko-text-main);
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .products-checkout-delivery input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
   accent-color: #008c84;
+}
+
+.products-checkout-delivery label:has(input:checked) {
+  border-color: #00a99d;
+  box-shadow: 0 0 0 1px rgba(0, 169, 157, 0.12);
+}
+
+.products-checkout-delivery-description {
+  grid-column: 2;
+  color: var(--kokiko-text-secondary);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.35;
 }
 
 .products-checkout-form[data-delivery-method="pickup"] .products-courier-only,
@@ -990,7 +1027,7 @@ body {
 }
 
 .products-delivery-window {
-  border: 1px solid #c5cdd2;
+  border: 1px solid var(--kokiko-border-control);
   border-radius: 14px;
   padding: 14px;
   margin: 0;
@@ -1006,7 +1043,7 @@ body {
 
 #products-checkout-flow-delivery-windows {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
   gap: 14px;
 }
 
@@ -1032,19 +1069,22 @@ body {
   min-height: 36px;
   border-radius: 999px;
   padding: 6px 10px;
+  justify-self: start;
+  width: max-content;
+  max-width: 100%;
 }
 
 .products-delivery-window-slot.is-selected {
   border: 1px solid #00a99d;
-  background: #effffb;
+  background: var(--kokiko-bg-selected);
 }
 
 .products-pickup-window-card {
   display: grid;
   gap: 10px;
-  border: 1px solid #c5cdd2;
+  border: 1px solid var(--kokiko-border-control);
   border-radius: 4px;
-  background: #f8fafc;
+  background: var(--kokiko-bg-subtle);
   padding: 14px 16px;
 }
 
@@ -1086,9 +1126,10 @@ body {
 }
 
 .products-checkout-review-card {
-  border: 1px solid #c5cdd2;
+  border: 1px solid var(--kokiko-border-control);
   border-radius: 14px;
   padding: 16px;
+  background: var(--kokiko-bg-panel);
 }
 
 .products-checkout-review-card h4 {
@@ -1112,7 +1153,7 @@ body {
   gap: 16px;
   margin: 0;
   padding: 8px 0;
-  border-bottom: 1px solid #d8dee3;
+  border-bottom: 1px solid var(--kokiko-border-soft);
   color: var(--kokiko-text-main);
 }
 
@@ -1131,9 +1172,10 @@ body {
 
 .products-payment-methods label {
   min-height: 62px;
-  border: 1px solid #c5cdd2;
+  border: 1px solid var(--kokiko-border-control);
   border-radius: 14px;
   padding: 10px 12px;
+  background: var(--kokiko-bg-panel);
 }
 
 .products-checkout-consent {
@@ -1177,7 +1219,7 @@ body {
 
 .products-checkout-back {
   border: 1px solid #d5e1f5;
-  background: #ffffff;
+  background: var(--kokiko-bg-panel);
   color: #38599b;
 }
 
@@ -1501,8 +1543,7 @@ body {
     font-size: 34px;
   }
 
-  .products-payment-methods,
-  #products-checkout-flow-delivery-windows {
+  .products-payment-methods {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
