@@ -318,7 +318,7 @@ def _build_send_order_payload(
                 "floor": _normalize_text(arguments.get("floor")),
                 "intercomCode": _normalize_text(arguments.get("intercom_code")),
             },
-            "deliveryWindow": arguments.get("delivery_window"),
+            "deliveryWindow": _normalize_delivery_window(arguments.get("delivery_window")),
         }
     else:
         delivery_payload = {
@@ -353,6 +353,21 @@ def _build_payment_payload(arguments: dict[str, Any]) -> dict[str, Any]:
     if promo_code:
         payment["promo_code"] = promo_code
     return payment
+
+
+def _normalize_delivery_window(value: Any) -> dict[str, str] | None:
+    if not isinstance(value, dict):
+        return None
+    delivery_date = _normalize_text(value.get("deliveryDate") or value.get("date"))
+    delivery_from = _normalize_text(value.get("from"))
+    delivery_to = _normalize_text(value.get("to"))
+    if not delivery_date or not delivery_from or not delivery_to:
+        return None
+    return {
+        "deliveryDate": delivery_date,
+        "from": delivery_from,
+        "to": delivery_to,
+    }
 
 
 def _build_kokiko_headers(

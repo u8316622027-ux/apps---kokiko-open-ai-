@@ -191,6 +191,434 @@
       }
     };
 
+    const getApiBaseUrl = () =>
+      normalizeText(state.apiBaseUrl) || "https://api.apteka.md";
+
+    const buildFrontApiUrl = (path) => {
+      const cleanPath = `/${normalizeText(path).replace(/^\/+/, "")}`;
+      const baseUrl = getApiBaseUrl();
+      if (/\/api\/v1\/front\/?$/i.test(baseUrl)) {
+        return `${baseUrl.replace(/\/+$/, "")}${cleanPath}`;
+      }
+      return `${baseUrl.replace(/\/+$/, "")}/api/v1/front${cleanPath}`;
+    };
+
+    const getApiHeaders = () => ({
+      Accept: "application/json",
+      "Content-Type": "application/json; charset=utf-8",
+      market: "kokikomd",
+      "Accept-Language": getActiveLanguage(),
+    });
+
+    const fetchCheckoutJson = async (path) => {
+      if (typeof window.fetch !== "function") {
+        throw new Error("fetch is unavailable");
+      }
+      const response = await window.fetch(buildFrontApiUrl(path), {
+        method: "GET",
+        headers: getApiHeaders(),
+      });
+      if (!response || !response.ok) {
+        throw new Error(`Kokiko checkout request failed: ${path}`);
+      }
+      return response.json();
+    };
+
+    const getTranslatedName = (entity, fallback = "") => {
+      if (!entity || typeof entity !== "object") {
+        return normalizeText(fallback);
+      }
+      const language = getActiveLanguage();
+      const fallbackLanguage = language === "ru" ? "ro" : "ru";
+      const translations =
+        entity.translations && typeof entity.translations === "object"
+          ? entity.translations
+          : {};
+      const preferred =
+        translations[language] && typeof translations[language] === "object"
+          ? translations[language]
+          : {};
+      const fallbackTranslation =
+        translations[fallbackLanguage] &&
+        typeof translations[fallbackLanguage] === "object"
+          ? translations[fallbackLanguage]
+          : {};
+      return (
+        normalizeText(preferred.name) ||
+        normalizeText(fallbackTranslation.name) ||
+        normalizeText(entity.name) ||
+        normalizeText(fallback)
+      );
+    };
+
+    const getTranslatedAddress = (entity) => {
+      const language = getActiveLanguage();
+      const fallbackLanguage = language === "ru" ? "ro" : "ru";
+      const translations =
+        entity?.translations && typeof entity.translations === "object"
+          ? entity.translations
+          : {};
+      const preferred =
+        translations[language] && typeof translations[language] === "object"
+          ? translations[language]
+          : {};
+      const fallbackTranslation =
+        translations[fallbackLanguage] &&
+        typeof translations[fallbackLanguage] === "object"
+          ? translations[fallbackLanguage]
+          : {};
+      return (
+        normalizeText(preferred.address) ||
+        normalizeText(fallbackTranslation.address) ||
+        normalizeText(entity?.address)
+      );
+    };
+
+    const normalizeLookupId = (value) => normalizeText(value);
+
+    const mapRegion = (region) => {
+      if (!region || typeof region !== "object") {
+        return null;
+      }
+      const id = normalizeLookupId(region.id);
+      const name = getTranslatedName(region, id);
+      if (!id || !name) {
+        return null;
+      }
+      return { id, name, raw: region };
+    };
+
+    const mapSector = (sector, fallbackRegion) => {
+      if (!sector || typeof sector !== "object") {
+        return null;
+      }
+      const id = normalizeLookupId(sector.id);
+      const name = getTranslatedName(sector, id);
+      if (!id || !name) {
+        return null;
+      }
+      return {
+        id,
+        name,
+        regionId: normalizeLookupId(sector.region?.id || fallbackRegion?.id),
+        raw: sector,
+      };
+    };
+
+    const mapPharmacy = (pharmacy) => {
+      if (!pharmacy || typeof pharmacy !== "object") {
+        return null;
+      }
+      const id = normalizeLookupId(pharmacy.id);
+      const name = getTranslatedName(pharmacy, id);
+      if (!id || !name) {
+        return null;
+      }
+      const address = getTranslatedAddress(pharmacy);
+      const sector = mapSector(pharmacy.sector, pharmacy.region);
+      return {
+        id,
+        name,
+        label: [name, address].filter(Boolean).join(", "),
+        address,
+        regionId: normalizeLookupId(pharmacy.region?.id),
+        sectorId: sector?.id || "",
+        sectorName: sector?.name || "",
+        raw: pharmacy,
+      };
+    };
+
+    const uniqueById = (items) => {
+      const seen = new Set();
+      const result = [];
+      for (const item of items) {
+        if (!item?.id || seen.has(item.id)) {
+          continue;
+        }
+        seen.add(item.id);
+        result.push(item);
+      }
+      return result;
+    };
+
+    const getSelectedRegion = () => {
+      const selectedId = getCheckoutValue(checkoutRegion);
+      return (
+        state.checkoutRegions.find((region) => region.id === selectedId) ||
+        state.checkoutRegions[0] ||
+        null
+      );
+    };
+
+    const setSelectOptions = (select, options, preferredValue = "") => {
+      if (!(select instanceof HTMLSelectElement)) {
+        return "";
+      }
+      const normalizedOptions = options.filter((option) => option?.id);
+      const currentValue = normalizeLookupId(preferredValue || select.value);
+      const nextValue =
+        normalizedOptions.find((option) => option.id === currentValue)?.id ||
+        normalizedOptions[0]?.id ||
+        "";
+      const signature = normalizedOptions
+        .map((option) => `${option.id}:${option.name || option.label}`)
+        .join("|");
+      if (select.dataset.optionsSignature !== signature) {
+        select.innerHTML = normalizedOptions
+          .map((option) => {
+            const label = escapeHtml(option.label || option.name || option.id);
+            return `<option value="${escapeHtml(option.id)}">${label}</option>`;
+          })
+          .join("");
+        select.dataset.optionsSignature = signature;
+      }
+      select.value = nextValue;
+      return nextValue;
+    };
+
+    const normalizeDeliveryWindows = (payload) => {
+      if (!payload || typeof payload !== "object") {
+        return [];
+      }
+      const windows = [];
+      if (
+        payload.availableWindows &&
+        typeof payload.availableWindows === "object"
+      ) {
+        for (const [date, dayWindows] of Object.entries(
+          payload.availableWindows,
+        )) {
+          if (!Array.isArray(dayWindows)) {
+            continue;
+          }
+          for (const windowItem of dayWindows) {
+            if (!windowItem || typeof windowItem !== "object") {
+              continue;
+            }
+            windows.push({
+              deliveryDate:
+                normalizeText(windowItem.deliveryDate) || normalizeText(date),
+              from: normalizeText(windowItem.from),
+              to: normalizeText(windowItem.to),
+            });
+          }
+        }
+      }
+      if (normalizeText(payload.deliveryDate) && normalizeText(payload.from)) {
+        windows.push({
+          deliveryDate: normalizeText(payload.deliveryDate),
+          from: normalizeText(payload.from),
+          to: normalizeText(payload.to),
+          orderEnd: normalizeText(payload.orderEnd),
+          pharmacyClose: normalizeText(payload.pharmacyClose),
+        });
+      }
+      return windows.filter(
+        (windowItem) =>
+          windowItem.deliveryDate && windowItem.from && windowItem.to,
+      );
+    };
+
+    const extractSectors = (payload, fallbackRegion) => {
+      const candidates = [];
+      if (Array.isArray(payload?.sectors)) {
+        candidates.push(...payload.sectors);
+      }
+      if (Array.isArray(payload?.data?.sectors)) {
+        candidates.push(...payload.data.sectors);
+      }
+      if (Array.isArray(payload?.items)) {
+        candidates.push(...payload.items);
+      }
+      const sectors = uniqueById(
+        candidates
+          .map((sector) =>
+            mapSector(sector, fallbackRegion?.raw || fallbackRegion),
+          )
+          .filter(Boolean),
+      );
+      if (sectors.length) {
+        return sectors;
+      }
+      if (fallbackRegion?.id) {
+        return [
+          {
+            id: fallbackRegion.id,
+            name: fallbackRegion.name,
+            regionId: fallbackRegion.id,
+          },
+        ];
+      }
+      return [];
+    };
+
+    const renderDeliveryWindows = () => {
+      if (!(checkoutDeliveryWindows instanceof HTMLElement)) {
+        return;
+      }
+      const windows = state.checkoutDeliveryWindows || [];
+      if (!windows.length) {
+        checkoutDeliveryWindows.innerHTML =
+          '<p class="products-delivery-window-empty">Выберите регион или аптеку, чтобы увидеть время.</p>';
+        return;
+      }
+      checkoutDeliveryWindows.innerHTML = windows
+        .map((windowItem, index) => {
+          const checked = index === 0 ? "checked" : "";
+          const date = escapeHtml(windowItem.deliveryDate);
+          const time = `${escapeHtml(windowItem.from)} - ${escapeHtml(
+            windowItem.to,
+          )}`;
+          return `
+            <label>
+              <input type="radio" name="products-delivery-window" value="${index}" ${checked} />
+              <span>${date} • ${time}</span>
+            </label>
+          `;
+        })
+        .join("");
+    };
+
+    const renderCourierOptions = () => {
+      const selectedRegionId = setSelectOptions(
+        checkoutRegion,
+        state.checkoutRegions,
+        getCheckoutValue(checkoutRegion) || "2",
+      );
+      const selectedRegion =
+        state.checkoutRegions.find(
+          (region) => region.id === selectedRegionId,
+        ) || getSelectedRegion();
+      const targetPayload = selectedRegionId
+        ? state.checkoutTargetCache[selectedRegionId]
+        : null;
+      const sectors = extractSectors(targetPayload || {}, selectedRegion);
+      setSelectOptions(
+        checkoutSector,
+        sectors,
+        getCheckoutValue(checkoutSector),
+      );
+      if (targetPayload) {
+        state.checkoutDeliveryWindows = normalizeDeliveryWindows(targetPayload);
+      }
+    };
+
+    const getPickupPharmaciesForRegion = (regionId) =>
+      state.checkoutPharmacies.filter(
+        (pharmacy) => pharmacy.regionId === normalizeLookupId(regionId),
+      );
+
+    const renderPickupOptions = () => {
+      const selectedRegionId = setSelectOptions(
+        checkoutRegion,
+        state.checkoutRegions,
+        getCheckoutValue(checkoutRegion) || "2",
+      );
+      const pharmaciesForRegion =
+        getPickupPharmaciesForRegion(selectedRegionId);
+      const sectors = uniqueById(
+        pharmaciesForRegion
+          .filter((pharmacy) => pharmacy.sectorId)
+          .map((pharmacy) => ({
+            id: pharmacy.sectorId,
+            name: pharmacy.sectorName || pharmacy.regionId,
+            regionId: pharmacy.regionId,
+          })),
+      );
+      const selectedSectorId = setSelectOptions(
+        checkoutSector,
+        sectors,
+        getCheckoutValue(checkoutSector),
+      );
+      const pharmaciesForSector = pharmaciesForRegion.filter(
+        (pharmacy) =>
+          !selectedSectorId || pharmacy.sectorId === selectedSectorId,
+      );
+      const selectedPharmacyId = setSelectOptions(
+        checkoutPharmacy,
+        pharmaciesForSector,
+        getCheckoutValue(checkoutPharmacy),
+      );
+      const pickupPayload = selectedPharmacyId
+        ? state.checkoutPickupCache[selectedPharmacyId]
+        : null;
+      if (pickupPayload) {
+        state.checkoutDeliveryWindows = normalizeDeliveryWindows(pickupPayload);
+      }
+    };
+
+    const renderCheckoutDictionaries = () => {
+      if (getDeliveryMethod() === "courier") {
+        renderCourierOptions();
+      } else {
+        renderPickupOptions();
+      }
+      renderDeliveryWindows();
+    };
+
+    const ensureCheckoutLookups = async () => {
+      if (state.checkoutLookupsLoaded || state.checkoutLookupsLoading) {
+        return;
+      }
+      state.checkoutLookupsLoading = true;
+      try {
+        const [regionsPayload, pharmaciesPayload] = await Promise.all([
+          fetchCheckoutJson("/regions"),
+          fetchCheckoutJson("/pharmacies/list"),
+        ]);
+        state.checkoutRegions = Array.isArray(regionsPayload)
+          ? regionsPayload.map(mapRegion).filter(Boolean)
+          : [];
+        state.checkoutPharmacies = Array.isArray(pharmaciesPayload)
+          ? pharmaciesPayload.map(mapPharmacy).filter(Boolean)
+          : [];
+        state.checkoutLookupsLoaded = true;
+        renderCheckoutDictionaries();
+        await refreshCheckoutDeliveryData();
+      } catch (error) {
+        debugLog("checkout_lookup_error", {
+          message: String(error?.message ? error.message : error),
+          level: "warn",
+        });
+      } finally {
+        state.checkoutLookupsLoading = false;
+        renderCheckout();
+      }
+    };
+
+    const refreshCheckoutDeliveryData = async () => {
+      if (!state.checkoutLookupsLoaded) {
+        await ensureCheckoutLookups();
+        return;
+      }
+      try {
+        if (getDeliveryMethod() === "courier") {
+          const regionId = getCheckoutValue(checkoutRegion) || "2";
+          if (regionId && !state.checkoutTargetCache[regionId]) {
+            state.checkoutTargetCache[regionId] = await fetchCheckoutJson(
+              `/delivery/calculate/target/${encodeURIComponent(regionId)}`,
+            );
+          }
+        } else {
+          renderPickupOptions();
+          const pharmacyId = getCheckoutValue(checkoutPharmacy);
+          if (pharmacyId && !state.checkoutPickupCache[pharmacyId]) {
+            state.checkoutPickupCache[pharmacyId] = await fetchCheckoutJson(
+              `/delivery/calculate/pick-up/${encodeURIComponent(pharmacyId)}`,
+            );
+          }
+        }
+      } catch (error) {
+        debugLog("checkout_delivery_lookup_error", {
+          message: String(error?.message ? error.message : error),
+          level: "warn",
+        });
+      } finally {
+        renderCheckoutDictionaries();
+        renderCheckout();
+      }
+    };
+
     const setCartOpen = (nextState) => {
       if (!(cartLayer instanceof HTMLElement)) {
         return;
@@ -230,6 +658,7 @@
       state.checkoutOpen = isOpen;
       renderCheckout();
       if (isOpen) {
+        void ensureCheckoutLookups();
         window.setTimeout(() => {
           if (checkoutName instanceof HTMLInputElement) {
             checkoutName.focus();
@@ -251,6 +680,9 @@
       state.checkoutStep = normalized;
       setCheckoutStatus("", "");
       renderCheckout();
+      if (normalized === getCheckoutCopy().addressStep) {
+        void refreshCheckoutDeliveryData();
+      }
     };
 
     const nextCheckoutStep = () => {
@@ -343,10 +775,19 @@
       if (!(selected instanceof HTMLInputElement) || !selected.value) {
         return null;
       }
-      const [date, time] = selected.value.split("|");
+      const index = Number(selected.value);
+      const windowItem = state.checkoutDeliveryWindows[index];
+      if (!windowItem) {
+        return null;
+      }
       return {
-        date: normalizeText(date),
-        time: normalizeText(time),
+        deliveryDate: windowItem.deliveryDate,
+        from: windowItem.from,
+        to: windowItem.to,
+        date: windowItem.deliveryDate,
+        time: `${windowItem.from} - ${windowItem.to}`,
+        orderEnd: windowItem.orderEnd,
+        pharmacyClose: windowItem.pharmacyClose,
       };
     };
 
@@ -644,53 +1085,6 @@
       renderCheckout();
     };
 
-    const formatWindowDate = (date) =>
-      `${String(date.getDate()).padStart(2, "0")}.${String(
-        date.getMonth() + 1,
-      ).padStart(2, "0")}.${date.getFullYear()}`;
-
-    const renderDeliveryWindows = () => {
-      if (!(checkoutDeliveryWindows instanceof HTMLElement)) {
-        return;
-      }
-      if (checkoutDeliveryWindows.childElementCount > 0) {
-        return;
-      }
-      const slots = [
-        ["20:00 - 22:30", "22:00 - 23:30"],
-        ["12:00 - 16:00", "17:00 - 20:00", "20:00 - 22:00"],
-        ["12:00 - 16:00", "17:00 - 20:00", "20:00 - 22:00"],
-        ["10:00 - 14:00", "14:00 - 18:00", "17:00 - 20:00"],
-      ];
-      const today = new Date();
-      checkoutDeliveryWindows.innerHTML = slots
-        .map((daySlots, dayIndex) => {
-          const date = new Date(today);
-          date.setDate(today.getDate() + dayIndex);
-          const labelDate = formatWindowDate(date);
-          const options = daySlots
-            .map((slot, slotIndex) => {
-              const checked =
-                dayIndex === 0 && slotIndex === 0 ? "checked" : "";
-              const safeSlot = escapeHtml(slot);
-              return `
-                <label>
-                  <input type="radio" name="products-delivery-window" value="${escapeHtml(labelDate)}|${safeSlot}" ${checked} />
-                  <span>${safeSlot}</span>
-                </label>
-              `;
-            })
-            .join("");
-          return `
-            <div class="products-delivery-window-day">
-              <strong>${escapeHtml(labelDate)}</strong>
-              ${options}
-            </div>
-          `;
-        })
-        .join("");
-    };
-
     const renderCheckoutReview = () => {
       if (!(checkoutReview instanceof HTMLElement)) {
         return;
@@ -756,9 +1150,12 @@
           state.isSubmittingOrder ||
           (!state.cartItems.length && !state.orderSubmitted);
       }
-      renderDeliveryWindows();
-
       checkoutForm.dataset.deliveryMethod = getDeliveryMethod();
+      if (state.checkoutLookupsLoaded) {
+        renderCheckoutDictionaries();
+      } else {
+        renderDeliveryWindows();
+      }
       const steps = checkoutForm.querySelectorAll("[data-checkout-step]");
       for (const step of steps) {
         if (step instanceof HTMLElement) {
@@ -1045,6 +1442,7 @@
     ctx.actions.nextCheckoutStep = nextCheckoutStep;
     ctx.actions.previousCheckoutStep = previousCheckoutStep;
     ctx.actions.setCheckoutStep = setCheckoutStep;
+    ctx.actions.refreshCheckoutDeliveryData = refreshCheckoutDeliveryData;
     ctx.actions.submitOrder = submitOrder;
   };
 

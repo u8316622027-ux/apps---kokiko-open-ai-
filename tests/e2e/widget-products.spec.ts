@@ -181,6 +181,185 @@ test("products cart keeps checkout out of the cart list scroll", async ({
   await expect(page.locator("#products-cart-checkout")).toBeVisible();
 });
 
+test("products checkout loads courier regions sectors and delivery windows from Kokiko API", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.__KOKIKO_FETCH_CALLS__ = [];
+    window.fetch = async (url, options) => {
+      window.__KOKIKO_FETCH_CALLS__.push({
+        url: String(url),
+        market: options?.headers?.market,
+      });
+      if (String(url).endsWith("/regions")) {
+        return {
+          ok: true,
+          json: async () => [
+            { id: 2, translations: { ru: { name: "г. Кишинёв" } } },
+            { id: 7, translations: { ru: { name: "г. Бессарабка" } } },
+          ],
+        };
+      }
+      if (String(url).endsWith("/pharmacies/list")) {
+        return {
+          ok: true,
+          json: async () => [],
+        };
+      }
+      if (String(url).endsWith("/delivery/calculate/target/7")) {
+        return {
+          ok: true,
+          json: async () => ({
+            sectors: [{ id: 701, translations: { ru: { name: "Центр" } } }],
+            availableWindows: {
+              "21.07.2026": [
+                {
+                  deliveryDate: "21.07.2026",
+                  from: "13:00",
+                  to: "15:00",
+                },
+              ],
+            },
+          }),
+        };
+      }
+      if (String(url).includes("/delivery/calculate/target/")) {
+        return {
+          ok: true,
+          json: async () => ({ sectors: [], availableWindows: {} }),
+        };
+      }
+      throw new Error(`Unexpected fetch ${url}`);
+    };
+  });
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+  await page.locator('#products-checkout-flow input[value="courier"]').check();
+  await page.locator('[data-checkout-action="next"]').click();
+
+  await expect(page.locator("#products-checkout-flow-region")).toContainText(
+    "г. Бессарабка",
+  );
+  await page.locator("#products-checkout-flow-region").selectOption("7");
+  await expect(page.locator("#products-checkout-flow-sector")).toContainText(
+    "Центр",
+  );
+  await expect(
+    page.locator("#products-checkout-flow-delivery-windows"),
+  ).toContainText("13:00 - 15:00");
+
+  const calls = await page.evaluate(() => window.__KOKIKO_FETCH_CALLS__);
+  expect(calls.map((call) => call.url)).toEqual(
+    expect.arrayContaining([
+      "https://api.apteka.md/api/v1/front/regions",
+      "https://api.apteka.md/api/v1/front/pharmacies/list",
+      "https://api.apteka.md/api/v1/front/delivery/calculate/target/7",
+    ]),
+  );
+  expect(calls.every((call) => call.market === "kokikomd")).toBeTruthy();
+});
+
+test("products checkout filters pickup pharmacies by region and sector and loads pickup time", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.__KOKIKO_FETCH_CALLS__ = [];
+    window.fetch = async (url, options) => {
+      window.__KOKIKO_FETCH_CALLS__.push({
+        url: String(url),
+        market: options?.headers?.market,
+      });
+      if (String(url).endsWith("/regions")) {
+        return {
+          ok: true,
+          json: async () => [
+            { id: 2, translations: { ru: { name: "г. Кишинёв" } } },
+            { id: 7, translations: { ru: { name: "г. Бессарабка" } } },
+          ],
+        };
+      }
+      if (String(url).endsWith("/pharmacies/list")) {
+        return {
+          ok: true,
+          json: async () => [
+            {
+              id: 36,
+              translations: {
+                ru: {
+                  name: "Магазин КоКиКо",
+                  address: "ул. А. Руссо, 1",
+                  phone: "079 802 000",
+                },
+              },
+              region: { id: 2, translations: { ru: { name: "г. Кишинёв" } } },
+              sector: {
+                id: 1550,
+                translations: { ru: { name: "Рышкановка" } },
+              },
+            },
+            {
+              id: 77,
+              translations: {
+                ru: {
+                  name: "Аптека Бессарабка",
+                  address: "ул. Индепенденцей, 4",
+                  phone: "022 000 000",
+                },
+              },
+              region: {
+                id: 7,
+                translations: { ru: { name: "г. Бессарабка" } },
+              },
+              sector: { id: 701, translations: { ru: { name: "Центр" } } },
+            },
+          ],
+        };
+      }
+      if (String(url).endsWith("/delivery/calculate/pick-up/77")) {
+        return {
+          ok: true,
+          json: async () => ({
+            deliveryDate: "20.07.2026",
+            from: "14:00",
+            to: "20:00",
+            orderEnd: "23.07.2026",
+          }),
+        };
+      }
+      return { ok: true, json: async () => ({}) };
+    };
+  });
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+  await page.locator('[data-checkout-action="next"]').click();
+
+  await page.locator("#products-checkout-flow-region").selectOption("7");
+  await expect(page.locator("#products-checkout-flow-sector")).toContainText(
+    "Центр",
+  );
+  await expect(page.locator("#products-checkout-flow-pharmacy")).toContainText(
+    "Аптека Бессарабка",
+  );
+  await expect(
+    page.locator("#products-checkout-flow-delivery-windows"),
+  ).toContainText("14:00 - 20:00");
+
+  const calls = await page.evaluate(() => window.__KOKIKO_FETCH_CALLS__);
+  expect(calls.map((call) => call.url)).toEqual(
+    expect.arrayContaining([
+      "https://api.apteka.md/api/v1/front/regions",
+      "https://api.apteka.md/api/v1/front/pharmacies/list",
+      "https://api.apteka.md/api/v1/front/delivery/calculate/pick-up/77",
+    ]),
+  );
+});
+
 test("products widget submits checkout form through order tool", async ({
   page,
 }) => {

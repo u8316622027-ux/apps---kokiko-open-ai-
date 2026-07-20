@@ -110,6 +110,7 @@
 
   checkoutForm?.addEventListener("change", () => {
     ui.renderCheckout();
+    void actions.refreshCheckoutDeliveryData();
   });
 
   checkoutForm?.addEventListener("submit", (event) => {

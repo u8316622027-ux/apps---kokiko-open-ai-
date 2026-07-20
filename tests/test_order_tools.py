@@ -192,6 +192,40 @@ def test_submit_order_reuses_existing_kokiko_cart_token() -> None:
     assert client.calls[-1][1]["token"] == "existing-token"
 
 
+def test_submit_order_sends_official_delivery_window_fields_only() -> None:
+    client = FakeKokikoOrderClient()
+
+    submit_order(
+        {
+            "customer_name": "Ana Popescu",
+            "customer_phone": "+37379802000",
+            "delivery_method": "courier",
+            "street": "str. Alecu Russo",
+            "building": "1",
+            "address": "str. Alecu Russo, 1",
+            "delivery_window": {
+                "deliveryDate": "21.07.2026",
+                "from": "13:00",
+                "to": "15:00",
+                "date": "21.07.2026",
+                "time": "13:00 - 15:00",
+            },
+            "items": [{"id": "123", "name": "Face cream", "price": 99, "quantity": 1}],
+        },
+        client=client,
+    )
+
+    sent_order = client.calls[-1][1]
+    assert isinstance(sent_order, dict)
+    order_payload = sent_order["payload"]
+    assert isinstance(order_payload, dict)
+    assert order_payload["delivery"]["deliveryWindow"] == {
+        "deliveryDate": "21.07.2026",
+        "from": "13:00",
+        "to": "15:00",
+    }
+
+
 def test_kokiko_order_client_uses_site_cart_and_order_endpoints(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
