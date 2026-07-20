@@ -421,8 +421,14 @@
 
     const extractSectors = (payload, fallbackRegion) => {
       const candidates = [];
+      if (Array.isArray(payload)) {
+        candidates.push(...payload);
+      }
       if (Array.isArray(payload?.sectors)) {
         candidates.push(...payload.sectors);
+      }
+      if (Array.isArray(payload?.data)) {
+        candidates.push(...payload.data);
       }
       if (Array.isArray(payload?.data?.sectors)) {
         candidates.push(...payload.data.sectors);
@@ -492,7 +498,9 @@
       const targetPayload = selectedRegionId
         ? state.checkoutTargetCache[selectedRegionId]
         : null;
-      const sectors = extractSectors(targetPayload || {}, selectedRegion);
+      const sectors =
+        state.checkoutSectorCache[selectedRegionId] ||
+        extractSectors(targetPayload || {}, selectedRegion);
       setSelectOptions(
         checkoutSector,
         sectors,
@@ -594,10 +602,33 @@
       try {
         if (getDeliveryMethod() === "courier") {
           const regionId = getCheckoutValue(checkoutRegion) || "2";
-          if (regionId && !state.checkoutTargetCache[regionId]) {
-            state.checkoutTargetCache[regionId] = await fetchCheckoutJson(
-              `/delivery/calculate/target/${encodeURIComponent(regionId)}`,
-            );
+          if (regionId) {
+            const selectedRegion =
+              state.checkoutRegions.find((region) => region.id === regionId) ||
+              getSelectedRegion();
+            const lookupTasks = [];
+            if (!state.checkoutSectorCache[regionId]) {
+              lookupTasks.push(
+                fetchCheckoutJson(
+                  `/cities-by-region/${encodeURIComponent(regionId)}`,
+                ).then((payload) => {
+                  state.checkoutSectorCache[regionId] = extractSectors(
+                    payload,
+                    selectedRegion,
+                  );
+                }),
+              );
+            }
+            if (!state.checkoutTargetCache[regionId]) {
+              lookupTasks.push(
+                fetchCheckoutJson(
+                  `/delivery/calculate/target/${encodeURIComponent(regionId)}`,
+                ).then((payload) => {
+                  state.checkoutTargetCache[regionId] = payload;
+                }),
+              );
+            }
+            await Promise.all(lookupTasks);
           }
         } else {
           renderPickupOptions();

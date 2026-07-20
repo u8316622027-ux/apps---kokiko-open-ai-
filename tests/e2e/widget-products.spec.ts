@@ -206,11 +206,24 @@ test("products checkout loads courier regions sectors and delivery windows from 
           json: async () => [],
         };
       }
+      if (String(url).endsWith("/cities-by-region/7")) {
+        return {
+          ok: true,
+          json: async () => [
+            { id: 701, translations: { ru: { name: "Центр" } } },
+          ],
+        };
+      }
+      if (String(url).includes("/cities-by-region/")) {
+        return {
+          ok: true,
+          json: async () => [],
+        };
+      }
       if (String(url).endsWith("/delivery/calculate/target/7")) {
         return {
           ok: true,
           json: async () => ({
-            sectors: [{ id: 701, translations: { ru: { name: "Центр" } } }],
             availableWindows: {
               "21.07.2026": [
                 {
@@ -256,6 +269,7 @@ test("products checkout loads courier regions sectors and delivery windows from 
     expect.arrayContaining([
       "https://api.apteka.md/api/v1/front/regions",
       "https://api.apteka.md/api/v1/front/pharmacies/list",
+      "https://api.apteka.md/api/v1/front/cities-by-region/7",
       "https://api.apteka.md/api/v1/front/delivery/calculate/target/7",
     ]),
   );

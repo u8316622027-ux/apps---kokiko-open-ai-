@@ -19,6 +19,7 @@
       checkoutLookupsLoading: false,
       checkoutRegions: [],
       checkoutPharmacies: [],
+      checkoutSectorCache: {},
       checkoutTargetCache: {},
       checkoutPickupCache: {},
       checkoutDeliveryWindows: [],
