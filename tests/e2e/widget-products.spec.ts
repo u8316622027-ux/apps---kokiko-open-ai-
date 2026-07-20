@@ -478,6 +478,7 @@ test("products widget relocalizes products and checkout lookups when language ch
   await page.locator('#products-checkout-flow input[value="pickup"]').check();
   await page.locator('[data-checkout-action="next"]').click();
 
+  await page.locator("#products-checkout-flow-region").selectOption("2");
   await expect(page.locator("#products-checkout-flow-region")).toContainText(
     "г. Кишинёв",
   );
@@ -561,7 +562,7 @@ test("products checkout delivery step matches Kokiko card mechanics", async ({
   expect(Number.parseFloat(cardStyle.minHeight)).toBeLessThanOrEqual(112);
 });
 
-test("products checkout keeps expanded selects inside the app panel", async ({
+test("products checkout keeps native selects compact inside the app panel", async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -587,12 +588,13 @@ test("products checkout keeps expanded selects inside the app panel", async ({
   await page.locator('[data-action="add-to-cart"]').click();
   await page.locator("#products-cart-button").click();
   await page.locator("#products-cart-checkout").click();
+  await page.locator('#products-checkout-flow input[value="pickup"]').check();
   await page.locator('[data-checkout-action="next"]').click();
   await page.locator("#products-checkout-flow-region").focus();
 
   await expect(page.locator("#products-checkout-flow-region")).toHaveJSProperty(
     "size",
-    8,
+    0,
   );
   const boxes = await page.evaluate(() => {
     const panel = document.getElementById("products-cart-panel");
@@ -602,6 +604,87 @@ test("products checkout keeps expanded selects inside the app panel", async ({
     return { panelBottom: panelBox.bottom, selectBottom: selectBox.bottom };
   });
   expect(boxes.selectBottom).toBeLessThanOrEqual(boxes.panelBottom);
+});
+
+test("products checkout keeps sector disabled until a region is selected", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.__KOKIKO_FETCH_CALLS__ = [];
+    window.fetch = async (url, options) => {
+      window.__KOKIKO_FETCH_CALLS__.push({
+        url: String(url),
+        market: options?.headers?.market,
+      });
+      if (String(url).endsWith("/regions")) {
+        return {
+          ok: true,
+          json: async () => [
+            { id: 2, translations: { ru: { name: "Region A" } } },
+            { id: 7, translations: { ru: { name: "Region B" } } },
+          ],
+        };
+      }
+      if (String(url).endsWith("/pharmacies/list")) {
+        return { ok: true, json: async () => [] };
+      }
+      if (String(url).endsWith("/cities-by-region/7")) {
+        return {
+          ok: true,
+          json: async () => [
+            { id: 701, translations: { ru: { name: "Sector B" } } },
+          ],
+        };
+      }
+      if (String(url).endsWith("/delivery/calculate/target/7")) {
+        return {
+          ok: true,
+          json: async () => ({
+            availableWindows: {
+              "21.07.2026": [
+                { deliveryDate: "21.07.2026", from: "13:00", to: "15:00" },
+              ],
+            },
+          }),
+        };
+      }
+      throw new Error(`Unexpected fetch ${url}`);
+    };
+  });
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+  await page.locator('#products-checkout-flow input[value="courier"]').check();
+  await page.locator('[data-checkout-action="next"]').click();
+
+  const region = page.locator("#products-checkout-flow-region");
+  const sector = page.locator("#products-checkout-flow-sector");
+  await expect(region).toHaveValue("");
+  await expect(sector).toBeDisabled();
+  await expect(sector).toHaveValue("");
+  await expect(region).toHaveJSProperty("size", 0);
+
+  const callsBeforeRegion = await page.evaluate(() =>
+    window.__KOKIKO_FETCH_CALLS__.map((call) => call.url),
+  );
+  expect(callsBeforeRegion).not.toContain(
+    "https://api.apteka.md/api/v1/front/delivery/calculate/target/7",
+  );
+
+  const sectorBefore = await sector.boundingBox();
+  await region.focus();
+  await expect(region).toHaveJSProperty("size", 0);
+  const sectorAfterFocus = await sector.boundingBox();
+  expect(sectorAfterFocus?.height).toBe(sectorBefore?.height);
+
+  await region.selectOption("7");
+  await expect(sector).toBeEnabled();
+  await expect(sector).toContainText("Sector B");
+  await expect(
+    page.locator("#products-checkout-flow-delivery-windows"),
+  ).toContainText("13:00 - 15:00");
 });
 
 test("products checkout uses native select picker on mobile", async ({
@@ -631,6 +714,7 @@ test("products checkout uses native select picker on mobile", async ({
   await page.locator('[data-action="add-to-cart"]').click();
   await page.locator("#products-cart-button").click();
   await page.locator("#products-cart-checkout").click();
+  await page.locator('#products-checkout-flow input[value="pickup"]').check();
   await page.locator('[data-checkout-action="next"]').click();
   await page.locator("#products-checkout-flow-region").focus();
 
@@ -695,6 +779,7 @@ test("products checkout courier time slots stay compact in the modal", async ({
   await page.locator("#products-cart-checkout").click();
   await page.locator('#products-checkout-flow input[value="courier"]').check();
   await page.locator('[data-checkout-action="next"]').click();
+  await page.locator("#products-checkout-flow-region").selectOption("2");
 
   const firstSlot = page.locator(".products-delivery-window-slot").first();
   await expect(firstSlot).toBeVisible();
@@ -1065,6 +1150,51 @@ test("products checkout form can scroll on short screens", async ({ page }) => {
   expect(canScroll).toBeTruthy();
 });
 
+test("products toolbar adapts to a narrow app container", async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 720 });
+  await openWidgetWithProduct(page);
+  await page.addStyleTag({
+    content: ".widget-shell.search-mock { width: 360px !important; }",
+  });
+  await page.locator("#products-search-input").fill("shampoo");
+
+  const metrics = await page.evaluate(() => {
+    const logo = document.querySelector(".search-logo-link");
+    const actions = document.querySelector(".toolbar-actions");
+    const search = document.querySelector(".search-input-wrap");
+    const input = document.getElementById("products-search-input");
+    const readBox = (element) => {
+      if (!(element instanceof HTMLElement)) {
+        return null;
+      }
+      const box = element.getBoundingClientRect();
+      return {
+        left: box.left,
+        right: box.right,
+        top: box.top,
+        bottom: box.bottom,
+        width: box.width,
+      };
+    };
+    return {
+      scrollWidth: document.documentElement.scrollWidth,
+      viewport: window.innerWidth,
+      logo: readBox(logo),
+      actions: readBox(actions),
+      search: readBox(search),
+      input: readBox(input),
+      inputValue: input instanceof HTMLInputElement ? input.value : "",
+    };
+  });
+
+  expect(metrics.inputValue).toBe("shampoo");
+  expect(metrics.search.top).toBeGreaterThanOrEqual(metrics.actions.bottom + 4);
+  expect(metrics.input.width).toBeGreaterThanOrEqual(260);
+  expect(metrics.search.left).toBeGreaterThanOrEqual(metrics.logo.left);
+  expect(metrics.search.right).toBeLessThanOrEqual(metrics.actions.right);
+  expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.viewport);
+});
+
 test("products widget mobile shell does not overflow at 320px", async ({
   page,
 }) => {
@@ -1174,6 +1304,55 @@ test("products checkout mobile keeps primary controls reachable", async ({
   expect(Math.abs(metrics.back.top - metrics.next.top)).toBeLessThan(2);
   expect(metrics.back.height).toBeGreaterThanOrEqual(44);
   expect(metrics.next.height).toBeGreaterThanOrEqual(44);
+});
+
+test("products checkout review uses Kokiko summary layout and legal links", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 960, height: 720 });
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+  await page.locator('#products-checkout-flow input[value="pickup"]').check();
+  await page.locator('[data-checkout-action="next"]').click();
+  await page.locator("#products-checkout-flow-name").fill("Ana Popescu");
+  await page.locator("#products-checkout-flow-phone").fill("079 802 000");
+  await page.locator('[data-checkout-action="next"]').click();
+
+  await expect(page.locator('[data-checkout-step="review"]')).toBeVisible();
+  await expect(page.locator(".products-checkout-review-summary")).toBeVisible();
+  await expect(page.locator(".products-checkout-review-details")).toBeVisible();
+  await expect(page.locator(".products-review-product-image")).toBeVisible();
+  await expect(
+    page.locator(
+      '.products-checkout-consent a[href="https://www.kokiko.md/ru/info/terms"]',
+    ),
+  ).toBeVisible();
+  await expect(
+    page.locator(
+      '.products-checkout-consent a[href="https://www.kokiko.md/ru/info/policy"]',
+    ),
+  ).toBeVisible();
+
+  const layout = await page.evaluate(() => {
+    const summary = document.querySelector(".products-checkout-review-summary");
+    const details = document.querySelector(".products-checkout-review-details");
+    const review = document.querySelector(".products-checkout-review");
+    const summaryBox = summary?.getBoundingClientRect();
+    const detailsBox = details?.getBoundingClientRect();
+    return {
+      gridColumns: review ? getComputedStyle(review).gridTemplateColumns : "",
+      summaryLeft: summaryBox?.left || 0,
+      detailsLeft: detailsBox?.left || 0,
+      summaryWidth: summaryBox?.width || 0,
+      detailsWidth: detailsBox?.width || 0,
+    };
+  });
+  expect(layout.gridColumns.split(" ").length).toBeGreaterThanOrEqual(2);
+  expect(layout.detailsLeft).toBeGreaterThan(layout.summaryLeft);
+  expect(layout.summaryWidth).toBeGreaterThan(layout.detailsWidth);
 });
 
 test("products widget applies cart payload from text tools", async ({

@@ -111,14 +111,6 @@
     }
   });
 
-  const isMobileCheckoutViewport = () => {
-    try {
-      return window.matchMedia("(max-width: 480px)").matches;
-    } catch (_error) {
-      return window.innerWidth <= 480;
-    }
-  };
-
   const collapseCheckoutSelect = (select) => {
     if (!(select instanceof HTMLSelectElement)) {
       return;
@@ -131,12 +123,7 @@
     if (!(select instanceof HTMLSelectElement) || select.options.length < 2) {
       return;
     }
-    if (isMobileCheckoutViewport()) {
-      collapseCheckoutSelect(select);
-      return;
-    }
-    select.size = Math.min(8, select.options.length);
-    select.dataset.expanded = "true";
+    collapseCheckoutSelect(select);
   };
 
   checkoutForm?.addEventListener("focusin", (event) => {
@@ -281,9 +268,6 @@
   window.addEventListener(
     "resize",
     () => {
-      if (!isMobileCheckoutViewport()) {
-        return;
-      }
       for (const select of checkoutForm?.querySelectorAll(
         "select[data-expanded]",
       ) || []) {

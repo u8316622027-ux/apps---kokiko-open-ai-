@@ -138,17 +138,23 @@
             "Data și ora sunt preliminare. Așteptați apelul operatorului.",
           privacyConsent:
             "Sunt de acord cu termenii și politica de confidențialitate",
+          privacyConsentPrefix: "Sunt de acord cu",
+          privacyPolicyLabel: "politica de confidențialitate",
           pickupDate: "Data livrării:",
           region: "Regiune*",
           reviewCustomer: "Datele comenzii",
           reviewItems: "Lista produselor",
           search: "Caută",
           searchPlaceholder: "Caută produse",
+          selectPharmacy: "Alegeți farmacia",
+          selectRegion: "Alegeți regiunea",
+          selectSector: "Alegeți sectorul",
           sector: "Sector*",
           totalPayment: "Total de plată:",
           totalProducts: "Costul produselor:",
           street: "Stradă*",
           submitOrder: "Trimite comanda",
+          termsLabel: "termenii",
           darkTheme: "Tema întunecată",
           unavailable: "Nu este în stoc",
         };
@@ -198,17 +204,23 @@
           "Дата и время предварительные. Дождитесь звонка оператора.",
         privacyConsent:
           "Согласен с пользовательским соглашением / политикой конфиденциальности",
+        privacyConsentPrefix: "Согласен с",
+        privacyPolicyLabel: "политикой конфиденциальности",
         pickupDate: "Дата доставки:",
         region: "Регион*",
         reviewCustomer: "Данные заказа",
         reviewItems: "Список товаров",
         search: "Поиск",
         searchPlaceholder: "Искать по всем категориям",
+        selectPharmacy: "Выберите аптеку",
+        selectRegion: "Выберите регион",
+        selectSector: "Выберите сектор",
         sector: "Сектор*",
         totalPayment: "Итого к оплате:",
         totalProducts: "Стоимость товаров:",
         street: "Улица*",
         submitOrder: "Отправить заказ",
+        termsLabel: "пользовательским соглашением",
         darkTheme: "Темная тема",
         unavailable: "Нет в наличии",
       };
@@ -420,7 +432,13 @@
         ".products-checkout-consent span",
       );
       if (consent instanceof HTMLElement) {
-        consent.textContent = copy.privacyConsent;
+        consent.innerHTML = `${escapeHtml(
+          copy.privacyConsentPrefix,
+        )} <a href="https://www.kokiko.md/ru/info/terms" target="_blank" rel="noopener noreferrer">${escapeHtml(
+          copy.termsLabel,
+        )}</a> / <a href="https://www.kokiko.md/ru/info/policy" target="_blank" rel="noopener noreferrer">${escapeHtml(
+          copy.privacyPolicyLabel,
+        )}</a>`;
       }
     };
 
@@ -741,30 +759,59 @@
       );
     };
 
-    const setSelectOptions = (select, options, preferredValue = "") => {
+    const setSelectOptions = (
+      select,
+      options,
+      preferredValue = "",
+      config = {},
+    ) => {
       if (!(select instanceof HTMLSelectElement)) {
         return "";
       }
-      const normalizedOptions = options.filter((option) => option?.id);
-      const currentValue = normalizeLookupId(preferredValue || select.value);
+      const placeholder = normalizeText(config.placeholder);
+      const autoSelect = config.autoSelect !== false;
+      const shouldDisable = Boolean(config.disabled);
+      const normalizedOptions = (Array.isArray(options) ? options : []).filter(
+        (option) => option?.id,
+      );
+      const currentValue = normalizeLookupId(preferredValue);
       const nextValue =
         normalizedOptions.find((option) => option.id === currentValue)?.id ||
-        normalizedOptions[0]?.id ||
+        (autoSelect ? normalizedOptions[0]?.id : "") ||
         "";
-      const signature = normalizedOptions
-        .map((option) => `${option.id}:${option.name || option.label}`)
-        .join("|");
+      const signature = [
+        placeholder ? `:${placeholder}` : "",
+        ...normalizedOptions.map(
+          (option) => `${option.id}:${option.name || option.label}`,
+        ),
+      ].join("|");
       if (select.dataset.optionsSignature !== signature) {
-        select.innerHTML = normalizedOptions
+        const placeholderHtml = placeholder
+          ? `<option value="">${escapeHtml(placeholder)}</option>`
+          : "";
+        const optionsHtml = normalizedOptions
           .map((option) => {
             const label = escapeHtml(option.label || option.name || option.id);
             return `<option value="${escapeHtml(option.id)}">${label}</option>`;
           })
           .join("");
+        select.innerHTML = `${placeholderHtml}${optionsHtml}`;
         select.dataset.optionsSignature = signature;
       }
       select.value = nextValue;
+      if (shouldDisable) {
+        select.dataset.lookupDisabled = "true";
+      } else {
+        delete select.dataset.lookupDisabled;
+      }
       return nextValue;
+    };
+
+    const getInitializedSelectValue = (select) => {
+      if (!(select instanceof HTMLSelectElement)) {
+        return "";
+      }
+      return select.dataset.optionsSignature ? getCheckoutValue(select) : "";
     };
 
     const normalizeDeliveryWindows = (payload) => {
@@ -950,10 +997,16 @@
     };
 
     const renderCourierOptions = () => {
+      const copy = getUiCopy();
       const selectedRegionId = setSelectOptions(
         checkoutRegion,
         state.checkoutRegions,
-        getCheckoutValue(checkoutRegion) || "2",
+        getInitializedSelectValue(checkoutRegion),
+        {
+          autoSelect: false,
+          disabled: !state.checkoutRegions.length,
+          placeholder: copy.selectRegion,
+        },
       );
       const selectedRegion =
         state.checkoutRegions.find(
@@ -963,12 +1016,19 @@
         ? state.checkoutTargetCache[selectedRegionId]
         : null;
       const sectors =
-        state.checkoutSectorCache[selectedRegionId] ||
-        extractSectors(targetPayload || {}, selectedRegion);
+        selectedRegionId && state.checkoutSectorCache[selectedRegionId]
+          ? state.checkoutSectorCache[selectedRegionId]
+          : selectedRegionId && targetPayload
+            ? extractSectors(targetPayload, selectedRegion)
+            : [];
       setSelectOptions(
         checkoutSector,
         sectors,
-        getCheckoutValue(checkoutSector),
+        getInitializedSelectValue(checkoutSector),
+        {
+          disabled: !selectedRegionId || !sectors.length,
+          placeholder: copy.selectSector,
+        },
       );
       if (targetPayload) {
         state.checkoutDeliveryWindows = normalizeDeliveryWindows(targetPayload);
@@ -1032,14 +1092,21 @@
     };
 
     const renderPickupOptions = () => {
+      const copy = getUiCopy();
       const pickupRegions = getPickupRegions();
       const selectedRegionId = setSelectOptions(
         checkoutRegion,
         pickupRegions,
-        getCheckoutValue(checkoutRegion),
+        getInitializedSelectValue(checkoutRegion),
+        {
+          autoSelect: false,
+          disabled: !pickupRegions.length,
+          placeholder: copy.selectRegion,
+        },
       );
-      const pharmaciesForRegion =
-        getPickupPharmaciesForRegion(selectedRegionId);
+      const pharmaciesForRegion = selectedRegionId
+        ? getPickupPharmaciesForRegion(selectedRegionId)
+        : [];
       const sectors = uniqueById(
         pharmaciesForRegion
           .filter((pharmacy) => pharmacy.sectorId)
@@ -1052,7 +1119,11 @@
       const selectedSectorId = setSelectOptions(
         checkoutSector,
         sectors,
-        getCheckoutValue(checkoutSector),
+        getInitializedSelectValue(checkoutSector),
+        {
+          disabled: !selectedRegionId || !sectors.length,
+          placeholder: copy.selectSector,
+        },
       );
       const pharmaciesForSector = pharmaciesForRegion.filter(
         (pharmacy) =>
@@ -1061,7 +1132,11 @@
       const selectedPharmacyId = setSelectOptions(
         checkoutPharmacy,
         pharmaciesForSector,
-        getCheckoutValue(checkoutPharmacy),
+        getInitializedSelectValue(checkoutPharmacy),
+        {
+          disabled: !selectedRegionId || !pharmaciesForSector.length,
+          placeholder: copy.selectPharmacy,
+        },
       );
       renderPickupPharmacyCards(pharmaciesForSector, selectedPharmacyId);
       const pickupPayload = selectedPharmacyId
@@ -1096,6 +1171,7 @@
       for (const select of [checkoutRegion, checkoutSector, checkoutPharmacy]) {
         if (select instanceof HTMLSelectElement) {
           select.dataset.optionsSignature = "";
+          delete select.dataset.lookupDisabled;
         }
       }
     };
@@ -1141,7 +1217,7 @@
       }
       try {
         if (getDeliveryMethod() === "courier") {
-          const regionId = getCheckoutValue(checkoutRegion) || "2";
+          const regionId = getCheckoutValue(checkoutRegion);
           if (regionId) {
             const selectedRegion =
               state.checkoutRegions.find((region) => region.id === regionId) ||
@@ -1742,42 +1818,94 @@
       const payload = buildOrderPayload();
       const deliveryLabel =
         payload.delivery_method === "courier" ? copy.courier : copy.pickup;
+      const selectedPharmacy = state.checkoutPharmacies.find(
+        (pharmacy) => Number(pharmacy.id) === Number(payload.pharmacy_id),
+      );
       const addressLabel =
         payload.delivery_method === "courier"
           ? payload.address || "-"
-          : copy.pickupFromStore;
+          : selectedPharmacy?.label || copy.pickupFromStore;
       const deliveryWindow = payload.delivery_window
         ? `${payload.delivery_window.date} • ${payload.delivery_window.time}`
         : payload.delivery_method === "pickup"
           ? copy.pickupFromStore
           : "-";
+      const pickupWindow =
+        payload.delivery_method === "pickup"
+          ? state.checkoutDeliveryWindows[
+              Math.min(
+                Math.max(Number(state.checkoutDeliveryWindowIndex) || 0, 0),
+                Math.max(state.checkoutDeliveryWindows.length - 1, 0),
+              )
+            ]
+          : null;
+      const deliveryWindowSource = payload.delivery_window || pickupWindow;
+      const reviewDeliveryWindow = deliveryWindowSource
+        ? `${deliveryWindowSource.date || deliveryWindowSource.deliveryDate || ""} • ${
+            deliveryWindowSource.time ||
+            [deliveryWindowSource.from, deliveryWindowSource.to]
+              .filter(Boolean)
+              .join(" - ")
+          }`
+        : deliveryWindow;
       const itemsHtml = state.cartItems
         .map((item) => {
           const lineTotal = toMoney(item.price * item.quantity);
           const itemName = getLocalizedProductName(item) || item.name;
+          const safeImageUrl = escapeHtml(item.imageUrl || getFallbackImage());
+          const safeName = escapeHtml(itemName);
           return `
-            <li>
-              <span>${escapeHtml(itemName)}</span>
-              <strong>${toMoney(item.price)} x ${item.quantity} = ${lineTotal}</strong>
+            <li class="products-review-product">
+              <img
+                class="products-review-product-image"
+                src="${safeImageUrl}"
+                alt="${safeName}"
+                loading="lazy"
+                onerror="this.onerror=null;this.src='${escapeHtml(getFallbackImage())}'"
+              />
+              <span class="products-review-product-name">${safeName}</span>
+              <strong class="products-review-product-total">${toMoney(item.price)} x ${item.quantity} = ${lineTotal}</strong>
             </li>
           `;
         })
         .join("");
+      const detailRows = [
+        [copy.name.replace("*", ""), payload.customer_name || "-"],
+        [copy.phone.replace("*", ""), payload.customer_phone || "-"],
+        [copy.deliveryType, deliveryLabel],
+        [copy.address, addressLabel],
+        [copy.pickupDate, reviewDeliveryWindow],
+        [copy.comment, payload.comment || "-"],
+      ];
+      if (
+        payload.delivery_method === "pickup" &&
+        selectedPharmacy?.scheduleText
+      ) {
+        detailRows.splice(4, 0, [
+          getActiveLanguage() === "ro" ? "Program:" : "График работы:",
+          selectedPharmacy.scheduleText,
+        ]);
+      }
+      const detailsHtml = detailRows
+        .map(
+          ([label, value]) => `
+            <p class="products-review-detail-row">
+              <span>${escapeHtml(label)}</span>
+              <strong>${escapeHtml(value)}</strong>
+            </p>
+          `,
+        )
+        .join("");
       checkoutReview.innerHTML = `
-        <div class="products-checkout-review-card">
+        <div class="products-checkout-review-summary">
           <h4>${escapeHtml(copy.reviewItems)}</h4>
-          <ul>${itemsHtml}</ul>
-          <p><span>${escapeHtml(copy.totalProducts)}</span><strong>${toMoney(getCartTotal())}</strong></p>
-          <p><span>${escapeHtml(copy.totalPayment)}</span><strong>${toMoney(getCartTotal())}</strong></p>
+          <ul class="products-review-product-list">${itemsHtml}</ul>
+          <p class="products-review-total-row"><span>${escapeHtml(copy.totalProducts)}</span><strong>${toMoney(getCartTotal())}</strong></p>
+          <p class="products-review-total-row products-review-total-row--highlight"><span>${escapeHtml(copy.totalPayment)}</span><strong>${toMoney(getCartTotal())}</strong></p>
         </div>
-        <div class="products-checkout-review-card">
+        <div class="products-checkout-review-details">
           <h4>${escapeHtml(copy.reviewCustomer)}</h4>
-          <p><span>${escapeHtml(copy.name)}</span><strong>${escapeHtml(payload.customer_name || "-")}</strong></p>
-          <p><span>${escapeHtml(copy.phone)}</span><strong>${escapeHtml(payload.customer_phone || "-")}</strong></p>
-          <p><span>${escapeHtml(copy.deliveryType)}</span><strong>${escapeHtml(deliveryLabel)}</strong></p>
-          <p><span>${escapeHtml(copy.address)}</span><strong>${escapeHtml(addressLabel)}</strong></p>
-          <p><span>${escapeHtml(copy.pickupDate)}</span><strong>${escapeHtml(deliveryWindow)}</strong></p>
-          <p><span>${escapeHtml(copy.comment)}</span><strong>${escapeHtml(payload.comment || "-")}</strong></p>
+          ${detailsHtml}
         </div>
       `;
     };
@@ -1859,8 +1987,12 @@
           control instanceof HTMLSelectElement ||
           control instanceof HTMLButtonElement
         ) {
+          const lookupDisabled =
+            control instanceof HTMLSelectElement &&
+            control.dataset.lookupDisabled === "true";
           control.disabled =
             state.isSubmittingOrder ||
+            lookupDisabled ||
             (state.orderSubmitted &&
               control.id !== "products-checkout-flow-back");
         }
