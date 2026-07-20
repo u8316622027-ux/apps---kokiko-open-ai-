@@ -14,6 +14,11 @@ from app.interfaces.mcp.tools.cart_tools import (
     update_cart_item,
 )
 from app.interfaces.mcp.tools.order_tools import submit_order
+from app.interfaces.mcp.tools.preference_tools import (
+    open_checkout,
+    set_widget_language,
+    set_widget_theme,
+)
 from app.interfaces.mcp.tools.search_tools import search_products
 
 
@@ -219,6 +224,108 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
                 "invoked": "Cart checked.",
             },
         ),
+        "set_widget_theme": ToolDefinition(
+            name="set_widget_theme",
+            title="Set widget theme",
+            description=(
+                "Switch the products widget theme from text control. Use light, dark, or auto."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "theme": {
+                        "type": "string",
+                        "enum": ["light", "dark", "auto"],
+                    },
+                    "language": {
+                        "type": "string",
+                        "enum": ["ru", "ro"],
+                    },
+                },
+                "required": ["theme"],
+            },
+            handler=_set_widget_theme_handler,
+            output_template="ui://widget/products.html",
+            ui=widget_ui_config,
+            annotations={
+                "readOnlyHint": False,
+                "openWorldHint": False,
+                "destructiveHint": False,
+            },
+            tool_invocation={
+                "invoking": "Switching theme...",
+                "invoked": "Theme switched.",
+            },
+        ),
+        "set_widget_language": ToolDefinition(
+            name="set_widget_language",
+            title="Set widget language",
+            description="Switch the products widget language between Russian and Romanian.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "language": {
+                        "type": "string",
+                        "enum": ["ru", "ro"],
+                    },
+                    "theme": {
+                        "type": "string",
+                        "enum": ["light", "dark", "auto"],
+                    },
+                },
+                "required": ["language"],
+            },
+            handler=_set_widget_language_handler,
+            output_template="ui://widget/products.html",
+            ui=widget_ui_config,
+            annotations={
+                "readOnlyHint": False,
+                "openWorldHint": False,
+                "destructiveHint": False,
+            },
+            tool_invocation={
+                "invoking": "Switching language...",
+                "invoked": "Language switched.",
+            },
+        ),
+        "open_checkout": ToolDefinition(
+            name="open_checkout",
+            title="Open checkout",
+            description=(
+                "Open the products widget directly on checkout using an optional cart payload. "
+                "Use submit_order only when the customer data is complete "
+                "and the order should be sent."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "cart": {
+                        "type": "object",
+                        "description": "Current cart payload with token and items.",
+                    },
+                    "language": {
+                        "type": "string",
+                        "enum": ["ru", "ro"],
+                    },
+                    "theme": {
+                        "type": "string",
+                        "enum": ["light", "dark", "auto"],
+                    },
+                },
+            },
+            handler=_open_checkout_handler,
+            output_template="ui://widget/products.html",
+            ui=widget_ui_config,
+            annotations={
+                "readOnlyHint": True,
+                "openWorldHint": False,
+                "destructiveHint": False,
+            },
+            tool_invocation={
+                "invoking": "Opening checkout...",
+                "invoked": "Checkout opened.",
+            },
+        ),
     }
 
 
@@ -289,6 +396,8 @@ def _resolve_widget_page(tool_name: str) -> str:
         return "search"
     if tool_name in {"add_to_cart", "remove_from_cart", "update_cart_item", "check_cart"}:
         return "cart"
+    if tool_name == "open_checkout":
+        return "checkout"
     return "default"
 
 
@@ -377,3 +486,15 @@ def _update_cart_item_handler(arguments: dict[str, Any]) -> dict[str, Any]:
 
 def _check_cart_handler(arguments: dict[str, Any]) -> dict[str, Any]:
     return check_cart(arguments)
+
+
+def _set_widget_theme_handler(arguments: dict[str, Any]) -> dict[str, Any]:
+    return set_widget_theme(arguments)
+
+
+def _set_widget_language_handler(arguments: dict[str, Any]) -> dict[str, Any]:
+    return set_widget_language(arguments)
+
+
+def _open_checkout_handler(arguments: dict[str, Any]) -> dict[str, Any]:
+    return open_checkout(arguments)

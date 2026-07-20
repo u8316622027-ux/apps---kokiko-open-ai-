@@ -64,9 +64,19 @@ def test_cart_tools_are_registered_for_text_control() -> None:
     assert registry["add_to_cart"].annotations["readOnlyHint"] is False
 
 
-def test_theme_tool_is_removed() -> None:
+def test_theme_and_language_tools_are_registered_for_text_control() -> None:
     registry = tool_registry.create_tool_registry()
-    assert "set_widget_theme" not in registry
+
+    for name in ("set_widget_theme", "set_widget_language", "open_checkout"):
+        payload = tool_registry.serialize_tool_definition(registry[name])
+        assert payload["outputTemplate"] == "ui://widget/products.html"
+        assert payload["_meta"]["openai/outputTemplate"] == "ui://widget/products.html"
+        assert payload["annotations"]["destructiveHint"] is False
+
+    theme_schema = registry["set_widget_theme"].input_schema
+    language_schema = registry["set_widget_language"].input_schema
+    assert theme_schema["properties"]["theme"]["enum"] == ["light", "dark", "auto"]
+    assert language_schema["properties"]["language"]["enum"] == ["ru", "ro"]
 
 
 def test_widget_ui_config_includes_resource_and_connect_domains(

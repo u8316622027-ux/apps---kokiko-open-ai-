@@ -233,6 +233,8 @@ body {
   transform: translateY(-50%) scale(0.96);
 }
 
+.language-toggle-button,
+.theme-toggle-button,
 .support-button {
   position: relative;
   width: 44px;
@@ -245,6 +247,22 @@ body {
   place-items: center;
   cursor: pointer;
   transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.language-toggle-button,
+.theme-toggle-button {
+  border-color: rgba(100, 227, 213, 0.62);
+}
+
+.language-toggle-button {
+  color: var(--kokiko-text-on-dark);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.theme-toggle-button[data-theme-state="dark"] {
+  background: rgba(100, 227, 213, 0.18);
 }
 
 .toolbar-actions {
@@ -269,6 +287,8 @@ body {
     160ms ease;
 }
 
+.language-toggle-button:hover,
+.theme-toggle-button:hover,
 .cart-button:hover,
 .cart-button.has-items {
   border-color: #64e3d5;
@@ -1408,6 +1428,8 @@ body {
 .search-input-wrap input:focus-visible,
 .search-icon:focus-visible,
 .carousel-arrow:focus-visible,
+.language-toggle-button:focus-visible,
+.theme-toggle-button:focus-visible,
 .cart-button:focus-visible,
 .support-button:focus-visible {
   outline: 2px solid #85a5ef;
@@ -1442,6 +1464,11 @@ body {
 .products-icon--cart {
   width: 22px;
   height: 22px;
+}
+
+.products-icon--theme {
+  width: 20px;
+  height: 20px;
 }
 
 .products-icon--external {
@@ -1517,6 +1544,8 @@ body {
     font-size: 14px;
   }
 
+  .language-toggle-button,
+  .theme-toggle-button,
   .cart-button,
   .support-button {
     width: 40px;

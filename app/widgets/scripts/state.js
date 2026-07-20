@@ -4,6 +4,7 @@
     const INITIAL_PAYLOAD_POLL_MS = 140;
     const FALLBACK_IMAGE_PATH = "/assets/images/placeholder-600x600.png";
     const CART_STORAGE_KEY = "kokiko_widget_cart";
+    const LANGUAGE_STORAGE_KEY = "kokiko_widget_language";
 
     const state = {
       loadedOnce: false,
@@ -41,6 +42,8 @@
     const supportButton = document.getElementById("products-support-button");
     const supportLayer = document.getElementById("products-support-layer");
     const supportPopup = document.getElementById("products-support-popup");
+    const languageButton = document.getElementById("products-language-toggle");
+    const themeButton = document.getElementById("products-theme-toggle");
     const cartButton = document.getElementById("products-cart-button");
     const cartCount = document.getElementById("products-cart-count");
     const cartLayer = document.getElementById("products-cart-layer");
@@ -121,6 +124,32 @@
       }
       return "";
     };
+    const readStorageValue = (key) => {
+      try {
+        return window.localStorage.getItem(key);
+      } catch (_error) {
+        return null;
+      }
+    };
+    const writeStorageValue = (key, value) => {
+      try {
+        window.localStorage.setItem(key, value);
+      } catch (_error) {
+        // ignore storage errors
+      }
+    };
+    const setActiveLanguage = (language, options = {}) => {
+      const normalized = normalizeLanguage(language);
+      if (!normalized) {
+        return "";
+      }
+      state.language = normalized;
+      if (options.persist) {
+        writeStorageValue(LANGUAGE_STORAGE_KEY, normalized);
+      }
+      return normalized;
+    };
+    setActiveLanguage(readStorageValue(LANGUAGE_STORAGE_KEY));
     const escapeHtml = (value) =>
       String(value || "")
         .replaceAll("&", "&amp;")
@@ -579,6 +608,7 @@
         INITIAL_PAYLOAD_WAIT_MS,
         INITIAL_PAYLOAD_POLL_MS,
         CART_STORAGE_KEY,
+        LANGUAGE_STORAGE_KEY,
       },
       dom: {
         input,
@@ -590,6 +620,8 @@
         supportButton,
         supportLayer,
         supportPopup,
+        languageButton,
+        themeButton,
         cartButton,
         cartCount,
         cartLayer,
@@ -632,6 +664,10 @@
       },
       actions: {
         searchProducts: (_query) => Promise.resolve(),
+        setLanguage: (_language) => {},
+        toggleLanguage: () => {},
+        setTheme: (_theme) => {},
+        toggleTheme: () => {},
         openSupportPopup: () => {},
         addToCart: (_productId) => {},
         changeCartQuantity: (_productId, _delta) => {},
@@ -652,6 +688,7 @@
       utils: {
         normalizeText,
         normalizeLanguage,
+        setActiveLanguage,
         escapeHtml,
         debugLog,
         toMoney,

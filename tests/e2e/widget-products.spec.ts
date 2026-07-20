@@ -181,6 +181,93 @@ test("products cart keeps checkout out of the cart list scroll", async ({
   await expect(page.locator("#products-cart-checkout")).toBeVisible();
 });
 
+test("products widget applies dark theme and Romanian language payload", async ({
+  page,
+}) => {
+  const htmlPath = path.resolve(process.cwd(), "app/widgets/products.html");
+  const htmlUrl = `file:///${htmlPath.replace(/\\/g, "/")}`;
+
+  await page.addInitScript(() => {
+    window.localStorage.clear();
+    window.__APTEKA_WIDGET_PAYLOAD__ = {
+      theme: "dark",
+      theme_mode: "manual",
+      language: "ro",
+      query: "crema",
+      products: [
+        {
+          id: "cream-1",
+          name_ru: "Крем",
+          name_ro: "Cremă de față",
+          manufacturer: "Kokiko",
+          price: 120,
+          discount_price: 99,
+          image: "",
+          slug_ro: "crema-de-fata",
+        },
+      ],
+    };
+  });
+
+  await page.goto(htmlUrl, { waitUntil: "domcontentloaded" });
+
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator("#products-search-input")).toHaveAttribute(
+    "placeholder",
+    "Caută produse",
+  );
+  await expect(page.locator('[data-action="add-to-cart"]')).toContainText(
+    "Cumpără",
+  );
+  await expect(page.locator(".product-title")).toContainText("Cremă de față");
+});
+
+test("products widget keeps manually selected language after reload", async ({
+  page,
+}) => {
+  const htmlPath = path.resolve(process.cwd(), "app/widgets/products.html");
+  const htmlUrl = `file:///${htmlPath.replace(/\\/g, "/")}`;
+
+  await page.addInitScript(() => {
+    const alreadyReady = window.localStorage.getItem(
+      "__kokiko_language_test_ready",
+    );
+    if (!alreadyReady) {
+      window.localStorage.clear();
+      window.localStorage.setItem("__kokiko_language_test_ready", "1");
+    }
+    window.__APTEKA_WIDGET_PAYLOAD__ = {
+      ...(alreadyReady ? {} : { language: "ru" }),
+      query: "cream",
+      products: [
+        {
+          id: "cream-1",
+          name_ru: "Face cream",
+          name_ro: "Crema",
+          manufacturer: "Kokiko",
+          price: 120,
+          discount_price: 99,
+          image: "",
+          slug_ro: "crema",
+        },
+      ],
+    };
+  });
+
+  await page.goto(htmlUrl, { waitUntil: "domcontentloaded" });
+  await page.locator("#products-language-toggle").click();
+  await expect(page.locator("#products-search-input")).toHaveAttribute(
+    "placeholder",
+    "Caută produse",
+  );
+
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.locator("#products-search-input")).toHaveAttribute(
+    "placeholder",
+    "Caută produse",
+  );
+});
+
 test("products checkout loads courier regions sectors and delivery windows from Kokiko API", async ({
   page,
 }) => {

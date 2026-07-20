@@ -80,6 +80,11 @@
       debugLog("theme_applied", { theme: normalized });
     };
 
+    const getCurrentTheme = () =>
+      normalizeTheme(root.getAttribute("data-theme")) ||
+      normalizeTheme(document.documentElement.getAttribute("data-theme")) ||
+      "light";
+
     const applyAutoTheme = () => {
       applyTheme(resolveHostTheme());
     };
@@ -147,6 +152,7 @@
     listenToSchemeChanges();
 
     ctx.theme = {
+      getCurrentTheme,
       updateFromPayload,
       setManualTheme,
       setAutoTheme,

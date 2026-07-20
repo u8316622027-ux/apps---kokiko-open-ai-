@@ -2,9 +2,13 @@
   const attach = (ctx) => {
     const { state, dom, utils } = ctx;
     const {
+      input,
+      searchButton,
       track,
       leftArrow,
       rightArrow,
+      languageButton,
+      themeButton,
       cartButton,
       cartCount,
       cartLayer,
@@ -47,6 +51,8 @@
       getCartTotal,
       getFallbackImage,
       getActiveLanguage,
+      normalizeLanguage,
+      setActiveLanguage,
       debugLog,
     } = utils;
 
@@ -84,6 +90,87 @@
       };
     };
 
+    const getUiCopy = () => {
+      if (getActiveLanguage() === "ro") {
+        return {
+          address: "Adresă",
+          addressAndTime: "Adresă și timp",
+          apartment: "Apartament",
+          askAvailability: "Verifică disponibilitatea",
+          back: "Înapoi",
+          building: "Nr. casă*",
+          cartClose: "Închide coșul",
+          checkout: "Finalizare comandă",
+          checkoutTitle: "Finalizarea comenzii",
+          comment: "Comentariu",
+          courier: "Livrare prin curier",
+          delivery: "Livrare",
+          deliveryMethod: "Alegeți metoda de livrare:",
+          deliveryTime: "Alegeți timpul livrării:",
+          email: "Email",
+          entrance: "Scară",
+          floor: "Etaj",
+          intercom: "Cod interfon",
+          language: "Schimbă limba",
+          lightTheme: "Tema luminoasă",
+          name: "Nume*",
+          next: "Următorul",
+          openProduct: "Deschide pagina produsului",
+          paymentReview: "Revizuire și plată",
+          pharmacy: "Farmacie",
+          phone: "Număr de telefon*",
+          pickup: "Ridicare personală",
+          pickupDate: "Data livrării:",
+          region: "Regiune*",
+          search: "Caută",
+          searchPlaceholder: "Caută produse",
+          sector: "Sector*",
+          street: "Stradă*",
+          submitOrder: "Trimite comanda",
+          darkTheme: "Tema întunecată",
+          unavailable: "Nu este în stoc",
+        };
+      }
+      return {
+        address: "Адрес",
+        addressAndTime: "Адрес и время",
+        apartment: "Квартира",
+        askAvailability: "Уточнить наличие",
+        back: "Назад",
+        building: "№ дома*",
+        cartClose: "Закрыть корзину",
+        checkout: "Оформить заказ",
+        checkoutTitle: "Оформление заказа",
+        comment: "Комментарий",
+        courier: "Курьерская доставка",
+        delivery: "Доставка",
+        deliveryMethod: "Выберите способ доставки:",
+        deliveryTime: "Выберите время доставки:",
+        email: "Email",
+        entrance: "Подъезд",
+        floor: "Этаж",
+        intercom: "Код домофона",
+        language: "Сменить язык",
+        lightTheme: "Светлая тема",
+        name: "Имя*",
+        next: "Следующий",
+        openProduct: "Открыть страницу товара",
+        paymentReview: "Обзор и оплата",
+        pharmacy: "Аптека",
+        phone: "Номер телефона*",
+        pickup: "Самовывоз",
+        pickupDate: "Дата доставки:",
+        region: "Регион*",
+        search: "Поиск",
+        searchPlaceholder: "Искать по всем категориям",
+        sector: "Сектор*",
+        street: "Улица*",
+        submitOrder: "Отправить заказ",
+        darkTheme: "Темная тема",
+        unavailable: "Нет в наличии",
+      };
+    };
+
     const updateCarouselControls = () => {
       if (!track || !leftArrow || !rightArrow) {
         return;
@@ -106,16 +193,123 @@
       renderProducts();
     };
 
-    const getCheckoutCopy = () => ({
-      addressStep: "address",
-      deliveryStep: "delivery",
-      reviewStep: "review",
-      missingConsent: "Подтвердите согласие с условиями.",
-      missingDelivery: "Выберите способ доставки.",
-      missingStreet: "Укажите улицу и номер дома.",
-      next: "Продолжить",
-      submit: "Оформить",
-    });
+    const getCheckoutCopy = () => {
+      if (getActiveLanguage() === "ro") {
+        return {
+          addressStep: "address",
+          deliveryStep: "delivery",
+          reviewStep: "review",
+          missingConsent: "Confirmați acordul cu termenii.",
+          missingDelivery: "Alegeți metoda de livrare.",
+          missingStreet: "Introduceți strada și numărul casei.",
+          next: "Continuă",
+          submit: "Finalizează",
+        };
+      }
+      return {
+        addressStep: "address",
+        deliveryStep: "delivery",
+        reviewStep: "review",
+        missingConsent: "Подтвердите согласие с условиями.",
+        missingDelivery: "Выберите способ доставки.",
+        missingStreet: "Укажите улицу и номер дома.",
+        next: "Продолжить",
+        submit: "Оформить",
+      };
+    };
+
+    const setLabelText = (control, text) => {
+      const label =
+        control instanceof HTMLElement ? control.closest("label") : null;
+      const labelText =
+        label instanceof HTMLElement ? label.querySelector("span") : null;
+      if (labelText instanceof HTMLElement) {
+        labelText.textContent = text;
+      }
+    };
+
+    const renderStaticCopy = () => {
+      const copy = getUiCopy();
+      const cartCopy = getCartCopy();
+      const language = getActiveLanguage();
+      document.documentElement.lang = language;
+      if (input instanceof HTMLInputElement) {
+        input.placeholder = copy.searchPlaceholder;
+      }
+      searchButton?.setAttribute("aria-label", copy.search);
+      leftArrow?.setAttribute("aria-label", copy.back);
+      rightArrow?.setAttribute("aria-label", copy.next);
+      const cartTitle = document.getElementById("products-cart-title");
+      if (cartTitle instanceof HTMLElement) {
+        cartTitle.textContent = cartCopy.cart;
+      }
+      document
+        .getElementById("products-cart-close")
+        ?.setAttribute("aria-label", copy.cartClose);
+      languageButton?.setAttribute("aria-label", copy.language);
+      languageButton?.setAttribute("title", copy.language);
+      if (languageButton instanceof HTMLElement) {
+        languageButton.textContent = language === "ro" ? "RU" : "RO";
+      }
+      const currentTheme =
+        ctx.theme?.getCurrentTheme?.() ||
+        document.documentElement.getAttribute("data-theme") ||
+        "light";
+      const themeLabel =
+        currentTheme === "dark" ? copy.lightTheme : copy.darkTheme;
+      themeButton?.setAttribute("aria-label", themeLabel);
+      themeButton?.setAttribute("title", themeLabel);
+      if (themeButton instanceof HTMLElement) {
+        themeButton.dataset.themeState = currentTheme;
+      }
+      const checkoutTitles =
+        checkoutForm?.querySelectorAll(".products-checkout-title") || [];
+      for (const title of checkoutTitles) {
+        if (title instanceof HTMLElement) {
+          title.textContent = copy.checkoutTitle;
+        }
+      }
+      checkoutForm
+        ?.querySelector('[data-step-indicator="delivery"]')
+        ?.replaceChildren(copy.delivery);
+      checkoutForm
+        ?.querySelector('[data-step-indicator="address"]')
+        ?.replaceChildren(copy.addressAndTime);
+      checkoutForm
+        ?.querySelector('[data-step-indicator="review"]')
+        ?.replaceChildren(copy.paymentReview);
+      const deliveryLegend = checkoutForm?.querySelector(
+        '[data-checkout-step="delivery"] .products-checkout-delivery legend',
+      );
+      if (deliveryLegend instanceof HTMLElement) {
+        deliveryLegend.textContent = copy.deliveryMethod;
+      }
+      const courierLabel = checkoutForm?.querySelector(
+        'input[name="products-delivery-method"][value="courier"] + span',
+      );
+      const pickupLabel = checkoutForm?.querySelector(
+        'input[name="products-delivery-method"][value="pickup"] + span',
+      );
+      if (courierLabel instanceof HTMLElement) {
+        courierLabel.textContent = copy.courier;
+      }
+      if (pickupLabel instanceof HTMLElement) {
+        pickupLabel.textContent = copy.pickup;
+      }
+      setLabelText(checkoutName, copy.name);
+      setLabelText(checkoutPhone, copy.phone);
+      setLabelText(checkoutRegion, copy.region);
+      setLabelText(checkoutSector, copy.sector);
+      setLabelText(checkoutStreet, copy.street);
+      setLabelText(checkoutBuilding, copy.building);
+      setLabelText(checkoutApartment, copy.apartment);
+      setLabelText(checkoutEntrance, copy.entrance);
+      setLabelText(checkoutFloor, copy.floor);
+      setLabelText(checkoutIntercom, copy.intercom);
+      setLabelText(checkoutPharmacy, copy.pharmacy);
+      setLabelText(checkoutEmail, copy.email);
+      setLabelText(checkoutComment, copy.comment);
+    };
 
     const normalizeCartToolItem = (item) => ({
       id: item.id,
@@ -538,17 +732,26 @@
           ? fieldset.querySelector("legend")
           : null;
       if (legend instanceof HTMLElement) {
+        const copy = getUiCopy();
         legend.textContent =
           getDeliveryMethod() === "pickup"
-            ? "Дата доставки:"
-            : "Выберите время доставки:";
+            ? copy.pickupDate
+            : copy.deliveryTime;
       }
       const windows = state.checkoutDeliveryWindows || [];
       if (!windows.length) {
         checkoutDeliveryWindows.innerHTML =
           getDeliveryMethod() === "pickup"
-            ? '<p class="products-delivery-window-empty">Выберите аптеку, чтобы увидеть время.</p>'
-            : '<p class="products-delivery-window-empty">Выберите регион, чтобы увидеть время.</p>';
+            ? `<p class="products-delivery-window-empty">${escapeHtml(
+                getActiveLanguage() === "ro"
+                  ? "Alegeți farmacia pentru a vedea ora."
+                  : "Выберите аптеку, чтобы увидеть время.",
+              )}</p>`
+            : `<p class="products-delivery-window-empty">${escapeHtml(
+                getActiveLanguage() === "ro"
+                  ? "Alegeți regiunea pentru a vedea ora."
+                  : "Выберите регион, чтобы увидеть время.",
+              )}</p>`;
         return;
       }
       const selectedIndex = Math.min(
@@ -563,13 +766,13 @@
           normalizeText(windowItem.to) || normalizeText(windowItem.from);
         checkoutDeliveryWindows.innerHTML = `
           <div class="products-pickup-window-card">
-            <p><span>Дата доставки:</span><strong>${escapeHtml(windowItem.deliveryDate)} • ${escapeHtml(pickupTime)}</strong></p>
+            <p><span>${escapeHtml(getUiCopy().pickupDate)}</span><strong>${escapeHtml(windowItem.deliveryDate)} • ${escapeHtml(pickupTime)}</strong></p>
             ${
               cancelDate
                 ? `<p><span>Дата аннулирования:</span><strong class="products-pickup-window-card__danger">${escapeHtml(cancelDate)} • ${escapeHtml(pickupTime)}</strong></p>`
                 : ""
             }
-            <small>Дата и время предварительные. Дождитесь звонка оператора.</small>
+            <small>${escapeHtml(getActiveLanguage() === "ro" ? "Data și ora sunt preliminare. Așteptați apelul operatorului." : "Дата и время предварительные. Дождитесь звонка оператора.")}</small>
           </div>
         `;
         return;
@@ -879,6 +1082,42 @@
           }
         }, 0);
       }
+    };
+
+    const setLanguage = (language) => {
+      const normalized = setActiveLanguage(language, { persist: true });
+      if (!normalized) {
+        return;
+      }
+      renderStaticCopy();
+      renderProducts();
+      renderCart();
+      renderCheckout();
+      debugLog("language_applied", { language: normalized });
+    };
+
+    const toggleLanguage = () => {
+      setLanguage(getActiveLanguage() === "ro" ? "ru" : "ro");
+    };
+
+    const setTheme = (theme) => {
+      const normalized = normalizeText(theme).toLowerCase();
+      if (normalized === "auto") {
+        ctx.theme?.setAutoTheme?.();
+      } else if (normalized === "dark" || normalized === "light") {
+        ctx.theme?.setManualTheme?.(normalized);
+      } else {
+        return;
+      }
+      renderStaticCopy();
+    };
+
+    const toggleTheme = () => {
+      const currentTheme =
+        ctx.theme?.getCurrentTheme?.() ||
+        document.documentElement.getAttribute("data-theme") ||
+        "light";
+      setTheme(currentTheme === "dark" ? "light" : "dark");
     };
 
     const setCheckoutStep = (step) => {
@@ -1210,6 +1449,7 @@
     };
 
     const renderCart = () => {
+      renderStaticCopy();
       const copy = getCartCopy();
       const count = getCartCount();
       const total = getCartTotal();
@@ -1351,6 +1591,7 @@
       if (!(checkoutForm instanceof HTMLElement)) {
         return;
       }
+      renderStaticCopy();
       const shouldShowCheckout = state.checkoutOpen || state.orderSubmitted;
       checkoutForm.hidden = !shouldShowCheckout;
       if (cartPanel instanceof HTMLElement) {
@@ -1360,6 +1601,9 @@
         cartItems.hidden = shouldShowCheckout;
       }
       if (cartCheckout instanceof HTMLButtonElement) {
+        cartCheckout.textContent = shouldShowCheckout
+          ? getCartCopy().cart
+          : getUiCopy().checkout;
         cartCheckout.disabled =
           state.isSubmittingOrder ||
           (!state.cartItems.length && !state.orderSubmitted);
@@ -1399,6 +1643,7 @@
       }
       if (checkoutBack instanceof HTMLButtonElement) {
         checkoutBack.disabled = state.isSubmittingOrder;
+        checkoutBack.textContent = getUiCopy().back;
       }
       if (orderSubmit instanceof HTMLButtonElement) {
         orderSubmit.hidden =
@@ -1469,6 +1714,7 @@
     };
 
     const renderProducts = () => {
+      renderStaticCopy();
       if (!track) {
         return;
       }
@@ -1565,7 +1811,7 @@
           const inStock = typeof effectivePrice === "number";
           const priceLine = inStock
             ? `<p class="new-price">${toMoney(effectivePrice)}</p>`
-            : '<p class="new-price is-unavailable">Нет в наличии</p>';
+            : `<p class="new-price is-unavailable">${escapeHtml(getUiCopy().unavailable)}</p>`;
           const safeImageUrl = escapeHtml(product.imageUrl);
           const safeName = escapeHtml(product.name);
           const safeManufacturer = escapeHtml(product.manufacturer);
@@ -1580,7 +1826,7 @@
                 <button class="add-to-cart-button" type="button" data-action="add-to-cart" data-product-id="${safeProductId}" aria-label="Add to cart ${safeName}">
                   ${escapeHtml(copy.add)}
                 </button>
-                <a class="buy-link product-details-link" href="${safeProductUrl}" target="_blank" rel="noopener noreferrer" aria-label="Open product page">
+                <a class="buy-link product-details-link" href="${safeProductUrl}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(getUiCopy().openProduct)}">
                   <svg class="products-icon products-icon--external" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M14 4h6v6"></path>
                     <path d="M10 14L20 4"></path>
@@ -1588,7 +1834,7 @@
                   </svg>
                 </a>
               </div>`
-            : `<button class="add-to-cart-button add-to-cart-button--ghost" type="button" data-action="support-contact" data-product-id="${safeProductId}">Уточнить наличие</button>`;
+            : `<button class="add-to-cart-button add-to-cart-button--ghost" type="button" data-action="support-contact" data-product-id="${safeProductId}">${escapeHtml(getUiCopy().askAvailability)}</button>`;
 
           return `
             <article class="product-card ${inStock ? "" : "is-unavailable"}" data-product-id="${safeProductId}">
@@ -1647,6 +1893,10 @@
     ctx.ui.toggleCart = setCartOpen;
     ctx.ui.toggleCheckout = setCheckoutOpen;
     ctx.actions.addToCart = addToCart;
+    ctx.actions.setLanguage = setLanguage;
+    ctx.actions.toggleLanguage = toggleLanguage;
+    ctx.actions.setTheme = setTheme;
+    ctx.actions.toggleTheme = toggleTheme;
     ctx.actions.changeCartQuantity = changeCartQuantity;
     ctx.actions.removeFromCart = removeFromCart;
     ctx.actions.openCart = () => setCartOpen(true);

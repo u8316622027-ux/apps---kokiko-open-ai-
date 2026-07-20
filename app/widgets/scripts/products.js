@@ -21,6 +21,8 @@
   const {
     input,
     searchButton,
+    languageButton,
+    themeButton,
     track,
     leftArrow,
     rightArrow,
@@ -192,6 +194,16 @@
     actions.searchProducts(
       input instanceof HTMLInputElement ? input.value : "",
     );
+  });
+
+  languageButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    actions.toggleLanguage();
+  });
+
+  themeButton?.addEventListener("click", (event) => {
+    event.preventDefault();
+    actions.toggleTheme();
   });
 
   input?.addEventListener("keydown", (event) => {

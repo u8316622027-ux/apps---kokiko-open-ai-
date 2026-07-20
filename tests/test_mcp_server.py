@@ -26,6 +26,9 @@ def test_create_tool_registry_uses_base_handlers() -> None:
         "remove_from_cart",
         "update_cart_item",
         "check_cart",
+        "set_widget_theme",
+        "set_widget_language",
+        "open_checkout",
     ):
         assert server_registry[name].handler is base_registry[name].handler
 

@@ -7,6 +7,7 @@
     const {
       normalizeText,
       normalizeLanguage,
+      setActiveLanguage,
       getActiveLanguage,
       extractItems,
       mapProduct,
@@ -231,6 +232,7 @@
       }
       return (
         typeof payload.theme === "string" ||
+        typeof payload.language === "string" ||
         typeof payload.theme_mode === "string" ||
         typeof payload.mode === "string" ||
         typeof payload.auto_disabled === "boolean"
@@ -281,17 +283,36 @@
         return null;
       };
 
+      const applyPreferencePayload = (payload) => {
+        const language = normalizeLanguage(payload.language);
+        if (language) {
+          const action = normalizeText(payload.action).toLowerCase();
+          setActiveLanguage(language, {
+            persist: [
+              "open_checkout",
+              "set_widget_language",
+              "set_widget_theme",
+            ].includes(action),
+          });
+        }
+        theme.updateFromPayload(payload);
+        ctx.ui.renderProducts();
+        ctx.ui.renderCart();
+        ctx.ui.renderCheckout();
+      };
+
       const getThemeSignature = (payload) => {
         if (!payload || typeof payload !== "object") {
           return "";
         }
         const themeValue = normalizeText(payload.theme);
+        const languageValue = normalizeText(payload.language);
         const modeValue = normalizeText(payload.theme_mode || payload.mode);
         const autoValue =
           typeof payload.auto_disabled === "boolean"
             ? String(payload.auto_disabled)
             : "";
-        return [themeValue, modeValue, autoValue].join("|");
+        return [themeValue, languageValue, modeValue, autoValue].join("|");
       };
 
       const MAX_STABLE_THEME_TICKS = 50;
@@ -306,7 +327,7 @@
           return false;
         }
         lastThemeSignature = signature;
-        theme.updateFromPayload(payload);
+        applyPreferencePayload(payload);
         return true;
       };
 
@@ -315,7 +336,7 @@
         if (!isThemePayload(messagePayload)) {
           return;
         }
-        theme.updateFromPayload(messagePayload);
+        applyPreferencePayload(messagePayload);
       };
       window.addEventListener("message", onMessage, { passive: true });
       let stableTicks = 0;
