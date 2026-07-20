@@ -23,6 +23,7 @@
       checkoutTargetCache: {},
       checkoutPickupCache: {},
       checkoutDeliveryWindows: [],
+      checkoutDeliveryWindowIndex: 0,
       isSubmittingOrder: false,
       orderSubmitted: false,
       lastQuery: "",
@@ -88,6 +89,9 @@
     );
     const checkoutPharmacy = document.getElementById(
       "products-checkout-flow-pharmacy",
+    );
+    const checkoutPharmacyOptions = document.getElementById(
+      "products-checkout-flow-pharmacy-options",
     );
     const checkoutDeliveryWindows = document.getElementById(
       "products-checkout-flow-delivery-windows",
@@ -609,6 +613,7 @@
         checkoutRegion,
         checkoutSector,
         checkoutPharmacy,
+        checkoutPharmacyOptions,
         checkoutDeliveryWindows,
         checkoutReview,
         checkoutConsent,

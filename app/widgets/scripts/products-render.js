@@ -28,6 +28,7 @@
       checkoutRegion,
       checkoutSector,
       checkoutPharmacy,
+      checkoutPharmacyOptions,
       checkoutDeliveryWindows,
       checkoutReview,
       checkoutConsent,
@@ -274,6 +275,59 @@
       );
     };
 
+    const scheduleDayLabels = {
+      monday: "Понедельник",
+      tuesday: "Вторник",
+      wednesday: "Среда",
+      thursday: "Четверг",
+      friday: "Пятница",
+      saturday: "Суббота",
+      sunday: "Воскресенье",
+    };
+
+    const formatScheduleRange = (range) => {
+      const from = normalizeText(range?.from);
+      const to = normalizeText(range?.to);
+      return from && to ? `${from}-${to}` : "";
+    };
+
+    const formatPharmacySchedule = (schedule) => {
+      if (!schedule || typeof schedule !== "object") {
+        return "";
+      }
+      const weekdayRange = formatScheduleRange(schedule.monday);
+      const weekdaysMatch = [
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+      ].every((day) => formatScheduleRange(schedule[day]) === weekdayRange);
+      const parts = [];
+      if (weekdayRange && weekdaysMatch) {
+        parts.push(`Понедельник-Пятница: ${weekdayRange}`);
+      } else {
+        for (const day of [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+        ]) {
+          const range = formatScheduleRange(schedule[day]);
+          if (range) {
+            parts.push(`${scheduleDayLabels[day]}: ${range}`);
+          }
+        }
+      }
+      for (const day of ["saturday", "sunday"]) {
+        const range = formatScheduleRange(schedule[day]);
+        if (range) {
+          parts.push(`${scheduleDayLabels[day]}: ${range}`);
+        }
+      }
+      return parts.join(" • ");
+    };
+
     const normalizeLookupId = (value) => normalizeText(value);
 
     const mapRegion = (region) => {
@@ -316,14 +370,20 @@
       }
       const address = getTranslatedAddress(pharmacy);
       const sector = mapSector(pharmacy.sector, pharmacy.region);
+      const regionName = getTranslatedName(
+        pharmacy.region,
+        pharmacy.region?.id,
+      );
       return {
         id,
         name,
         label: [name, address].filter(Boolean).join(", "),
         address,
         regionId: normalizeLookupId(pharmacy.region?.id),
+        regionName,
         sectorId: sector?.id || "",
         sectorName: sector?.name || "",
+        scheduleText: formatPharmacySchedule(pharmacy.schedule),
         raw: pharmacy,
       };
     };
@@ -413,10 +473,18 @@
           pharmacyClose: normalizeText(payload.pharmacyClose),
         });
       }
-      return windows.filter(
-        (windowItem) =>
-          windowItem.deliveryDate && windowItem.from && windowItem.to,
-      );
+      const seen = new Set();
+      return windows.filter((windowItem) => {
+        if (!windowItem.deliveryDate || !windowItem.from || !windowItem.to) {
+          return false;
+        }
+        const key = `${windowItem.deliveryDate}|${windowItem.from}|${windowItem.to}`;
+        if (seen.has(key)) {
+          return false;
+        }
+        seen.add(key);
+        return true;
+      });
     };
 
     const extractSectors = (payload, fallbackRegion) => {
@@ -462,24 +530,79 @@
       if (!(checkoutDeliveryWindows instanceof HTMLElement)) {
         return;
       }
+      const fieldset = checkoutDeliveryWindows.closest(
+        ".products-delivery-window",
+      );
+      const legend =
+        fieldset instanceof HTMLElement
+          ? fieldset.querySelector("legend")
+          : null;
+      if (legend instanceof HTMLElement) {
+        legend.textContent =
+          getDeliveryMethod() === "pickup"
+            ? "Дата доставки:"
+            : "Выберите время доставки:";
+      }
       const windows = state.checkoutDeliveryWindows || [];
       if (!windows.length) {
         checkoutDeliveryWindows.innerHTML =
-          '<p class="products-delivery-window-empty">Выберите регион или аптеку, чтобы увидеть время.</p>';
+          getDeliveryMethod() === "pickup"
+            ? '<p class="products-delivery-window-empty">Выберите аптеку, чтобы увидеть время.</p>'
+            : '<p class="products-delivery-window-empty">Выберите регион, чтобы увидеть время.</p>';
         return;
       }
-      checkoutDeliveryWindows.innerHTML = windows
-        .map((windowItem, index) => {
-          const checked = index === 0 ? "checked" : "";
-          const date = escapeHtml(windowItem.deliveryDate);
-          const time = `${escapeHtml(windowItem.from)} - ${escapeHtml(
-            windowItem.to,
-          )}`;
+      const selectedIndex = Math.min(
+        Math.max(Number(state.checkoutDeliveryWindowIndex) || 0, 0),
+        windows.length - 1,
+      );
+      state.checkoutDeliveryWindowIndex = selectedIndex;
+      if (getDeliveryMethod() === "pickup") {
+        const windowItem = windows[selectedIndex];
+        const cancelDate = normalizeText(windowItem.orderEnd);
+        const pickupTime =
+          normalizeText(windowItem.to) || normalizeText(windowItem.from);
+        checkoutDeliveryWindows.innerHTML = `
+          <div class="products-pickup-window-card">
+            <p><span>Дата доставки:</span><strong>${escapeHtml(windowItem.deliveryDate)} • ${escapeHtml(pickupTime)}</strong></p>
+            ${
+              cancelDate
+                ? `<p><span>Дата аннулирования:</span><strong class="products-pickup-window-card__danger">${escapeHtml(cancelDate)} • ${escapeHtml(pickupTime)}</strong></p>`
+                : ""
+            }
+            <small>Дата и время предварительные. Дождитесь звонка оператора.</small>
+          </div>
+        `;
+        return;
+      }
+      const groups = new Map();
+      windows.forEach((windowItem, index) => {
+        const date = normalizeText(windowItem.deliveryDate);
+        if (!groups.has(date)) {
+          groups.set(date, []);
+        }
+        groups.get(date).push({ ...windowItem, index });
+      });
+      checkoutDeliveryWindows.innerHTML = Array.from(groups.entries())
+        .map(([date, dayWindows]) => {
+          const labels = dayWindows
+            .map((windowItem) => {
+              const checked =
+                windowItem.index === selectedIndex ? "checked" : "";
+              const selectedClass =
+                windowItem.index === selectedIndex ? " is-selected" : "";
+              return `
+                <label class="products-delivery-window-slot${selectedClass}">
+                  <input type="radio" name="products-delivery-window" value="${windowItem.index}" ${checked} />
+                  <span>${escapeHtml(windowItem.from)} - ${escapeHtml(windowItem.to)}</span>
+                </label>
+              `;
+            })
+            .join("");
           return `
-            <label>
-              <input type="radio" name="products-delivery-window" value="${index}" ${checked} />
-              <span>${date} • ${time}</span>
-            </label>
+            <div class="products-delivery-window-day">
+              <strong>${escapeHtml(date)}</strong>
+              ${labels}
+            </div>
           `;
         })
         .join("");
@@ -508,6 +631,8 @@
       );
       if (targetPayload) {
         state.checkoutDeliveryWindows = normalizeDeliveryWindows(targetPayload);
+      } else {
+        state.checkoutDeliveryWindows = [];
       }
     };
 
@@ -516,11 +641,62 @@
         (pharmacy) => pharmacy.regionId === normalizeLookupId(regionId),
       );
 
+    const getPickupRegions = () => {
+      const regionIds = new Set(
+        state.checkoutPharmacies
+          .map((pharmacy) => pharmacy.regionId)
+          .filter(Boolean),
+      );
+      const regions = state.checkoutRegions.filter((region) =>
+        regionIds.has(region.id),
+      );
+      const knownRegionIds = new Set(regions.map((region) => region.id));
+      const missingRegions = state.checkoutPharmacies
+        .filter(
+          (pharmacy) =>
+            pharmacy.regionId && !knownRegionIds.has(pharmacy.regionId),
+        )
+        .map((pharmacy) => ({
+          id: pharmacy.regionId,
+          name: pharmacy.regionName || pharmacy.regionId,
+        }));
+      return uniqueById([...regions, ...missingRegions]);
+    };
+
+    const renderPickupPharmacyCards = (pharmacies, selectedPharmacyId) => {
+      if (!(checkoutPharmacyOptions instanceof HTMLElement)) {
+        return;
+      }
+      if (!pharmacies.length) {
+        checkoutPharmacyOptions.innerHTML =
+          '<p class="products-delivery-window-empty">В выбранном секторе нет аптек.</p>';
+        return;
+      }
+      checkoutPharmacyOptions.innerHTML = pharmacies
+        .map((pharmacy) => {
+          const checked = pharmacy.id === selectedPharmacyId ? "checked" : "";
+          const selectedClass =
+            pharmacy.id === selectedPharmacyId ? " is-selected" : "";
+          const address = normalizeText(pharmacy.address);
+          const schedule = normalizeText(pharmacy.scheduleText);
+          return `
+            <label class="products-pharmacy-card${selectedClass}">
+              <input type="radio" name="products-pharmacy-option" value="${escapeHtml(pharmacy.id)}" ${checked} />
+              <span class="products-pharmacy-card__title">${escapeHtml(pharmacy.label || pharmacy.name)}</span>
+              ${address ? `<span class="products-pharmacy-card__address">${escapeHtml(address)}</span>` : ""}
+              ${schedule ? `<span class="products-pharmacy-card__schedule">${escapeHtml(schedule)}</span>` : ""}
+            </label>
+          `;
+        })
+        .join("");
+    };
+
     const renderPickupOptions = () => {
+      const pickupRegions = getPickupRegions();
       const selectedRegionId = setSelectOptions(
         checkoutRegion,
-        state.checkoutRegions,
-        getCheckoutValue(checkoutRegion) || "2",
+        pickupRegions,
+        getCheckoutValue(checkoutRegion),
       );
       const pharmaciesForRegion =
         getPickupPharmaciesForRegion(selectedRegionId);
@@ -547,11 +723,14 @@
         pharmaciesForSector,
         getCheckoutValue(checkoutPharmacy),
       );
+      renderPickupPharmacyCards(pharmaciesForSector, selectedPharmacyId);
       const pickupPayload = selectedPharmacyId
         ? state.checkoutPickupCache[selectedPharmacyId]
         : null;
       if (pickupPayload) {
         state.checkoutDeliveryWindows = normalizeDeliveryWindows(pickupPayload);
+      } else {
+        state.checkoutDeliveryWindows = [];
       }
     };
 
@@ -582,7 +761,6 @@
           : [];
         state.checkoutLookupsLoaded = true;
         renderCheckoutDictionaries();
-        await refreshCheckoutDeliveryData();
       } catch (error) {
         debugLog("checkout_lookup_error", {
           message: String(error?.message ? error.message : error),
@@ -597,6 +775,11 @@
     const refreshCheckoutDeliveryData = async () => {
       if (!state.checkoutLookupsLoaded) {
         await ensureCheckoutLookups();
+        if (!state.checkoutLookupsLoaded) {
+          return;
+        }
+      }
+      if (state.checkoutStep !== getCheckoutCopy().addressStep) {
         return;
       }
       try {

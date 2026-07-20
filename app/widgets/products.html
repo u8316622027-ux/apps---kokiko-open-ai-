@@ -347,9 +347,21 @@
 
                     <label class="products-checkout-field products-pickup-only products-checkout-field--wide">
                       <span>Аптека</span>
-                      <select id="products-checkout-flow-pharmacy" name="pharmacy_id">
+                      <select
+                        class="products-pharmacy-select"
+                        id="products-checkout-flow-pharmacy"
+                        name="pharmacy_id"
+                        aria-hidden="true"
+                        tabindex="-1"
+                      >
                         <option value="36">Магазин косметики КоКиКо, ул. А. Руссо, 1</option>
                       </select>
+                      <div
+                        class="products-pharmacy-options"
+                        id="products-checkout-flow-pharmacy-options"
+                        role="radiogroup"
+                        aria-label="Аптека"
+                      ></div>
                     </label>
 
                     <label class="products-checkout-field products-checkout-field--wide">
@@ -363,7 +375,7 @@
                     </label>
                   </div>
 
-                  <fieldset class="products-delivery-window products-courier-only">
+                  <fieldset class="products-delivery-window">
                     <legend>Выберите время доставки:</legend>
                     <div id="products-checkout-flow-delivery-windows"></div>
                   </fieldset>

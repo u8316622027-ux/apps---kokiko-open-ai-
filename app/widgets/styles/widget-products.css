@@ -868,6 +868,63 @@ body {
   max-height: 92px;
 }
 
+.products-pharmacy-select {
+  display: none;
+}
+
+.products-pharmacy-options {
+  display: grid;
+  gap: 10px;
+}
+
+.products-pharmacy-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 10px;
+  align-items: start;
+  border: 1px solid #c5cdd2;
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: #ffffff;
+  color: var(--kokiko-text-main);
+  cursor: pointer;
+}
+
+.products-pharmacy-card.is-selected {
+  border-color: #00a99d;
+  box-shadow: 0 0 0 2px rgba(0, 169, 157, 0.2);
+}
+
+.products-pharmacy-card input {
+  width: auto;
+  margin: 2px 0 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  accent-color: #008c84;
+}
+
+.products-pharmacy-card__title,
+.products-pharmacy-card__address,
+.products-pharmacy-card__schedule {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.products-pharmacy-card__title {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.products-pharmacy-card__address,
+.products-pharmacy-card__schedule {
+  grid-column: 2;
+  color: var(--kokiko-text-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .products-checkout-field input:focus,
 .products-checkout-field textarea:focus,
 .products-checkout-field select:focus {
@@ -929,8 +986,8 @@ body {
 
 #products-checkout-flow-delivery-windows {
   display: grid;
-  grid-template-columns: repeat(4, minmax(120px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 14px;
 }
 
 .products-delivery-window-day {
@@ -949,6 +1006,51 @@ body {
   gap: 8px;
   color: var(--kokiko-text-main);
   font-size: 14px;
+}
+
+.products-delivery-window-slot {
+  min-height: 36px;
+  border-radius: 999px;
+  padding: 6px 10px;
+}
+
+.products-delivery-window-slot.is-selected {
+  border: 1px solid #00a99d;
+  background: #effffb;
+}
+
+.products-pickup-window-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #c5cdd2;
+  border-radius: 4px;
+  background: #f8fafc;
+  padding: 14px 16px;
+}
+
+.products-pickup-window-card p {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0;
+  color: var(--kokiko-text-main);
+}
+
+.products-pickup-window-card span {
+  color: var(--kokiko-text-secondary);
+}
+
+.products-pickup-window-card strong {
+  font-weight: 800;
+}
+
+.products-pickup-window-card__danger {
+  color: var(--kokiko-sale);
+}
+
+.products-pickup-window-card small {
+  color: var(--kokiko-text-secondary);
+  line-height: 1.35;
 }
 
 .products-delivery-window-day input,

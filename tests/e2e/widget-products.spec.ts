@@ -231,6 +231,11 @@ test("products checkout loads courier regions sectors and delivery windows from 
                   from: "13:00",
                   to: "15:00",
                 },
+                {
+                  deliveryDate: "21.07.2026",
+                  from: "17:00",
+                  to: "20:00",
+                },
               ],
             },
           }),
@@ -263,6 +268,12 @@ test("products checkout loads courier regions sectors and delivery windows from 
   await expect(
     page.locator("#products-checkout-flow-delivery-windows"),
   ).toContainText("13:00 - 15:00");
+  await page
+    .locator('input[name="products-delivery-window"][value="1"]')
+    .click();
+  await expect(
+    page.locator('input[name="products-delivery-window"][value="1"]'),
+  ).toBeChecked();
 
   const calls = await page.evaluate(() => window.__KOKIKO_FETCH_CALLS__);
   expect(calls.map((call) => call.url)).toEqual(
@@ -274,6 +285,65 @@ test("products checkout loads courier regions sectors and delivery windows from 
     ]),
   );
   expect(calls.every((call) => call.market === "kokikomd")).toBeTruthy();
+});
+
+test("products checkout waits for address step before loading pickup time", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.__KOKIKO_FETCH_CALLS__ = [];
+    window.fetch = async (url, options) => {
+      window.__KOKIKO_FETCH_CALLS__.push({
+        url: String(url),
+        market: options?.headers?.market,
+      });
+      if (String(url).endsWith("/regions")) {
+        return {
+          ok: true,
+          json: async () => [
+            { id: 2, translations: { ru: { name: "Pickup Region" } } },
+          ],
+        };
+      }
+      if (String(url).endsWith("/pharmacies/list")) {
+        return {
+          ok: true,
+          json: async () => [
+            {
+              id: 1,
+              translations: {
+                ru: { name: "Pickup Pharmacy", address: "Main 1" },
+              },
+              region: {
+                id: 2,
+                translations: { ru: { name: "Pickup Region" } },
+              },
+              sector: { id: 20, translations: { ru: { name: "Center" } } },
+            },
+          ],
+        };
+      }
+      throw new Error(`Unexpected fetch ${url}`);
+    };
+  });
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__KOKIKO_FETCH_CALLS__.filter((call) =>
+            /\/(regions|pharmacies\/list)$/.test(call.url),
+          ).length,
+      ),
+    )
+    .toBeGreaterThanOrEqual(2);
+  const calls = await page.evaluate(() => window.__KOKIKO_FETCH_CALLS__);
+  expect(calls.some((call) => call.url.includes("/pick-up/"))).toBeFalsy();
 });
 
 test("products checkout filters pickup pharmacies by region and sector and loads pickup time", async ({
@@ -292,6 +362,7 @@ test("products checkout filters pickup pharmacies by region and sector and loads
           json: async () => [
             { id: 2, translations: { ru: { name: "г. Кишинёв" } } },
             { id: 7, translations: { ru: { name: "г. Бессарабка" } } },
+            { id: 99, translations: { ru: { name: "No Pharmacy Region" } } },
           ],
         };
       }
@@ -328,6 +399,15 @@ test("products checkout filters pickup pharmacies by region and sector and loads
                 translations: { ru: { name: "г. Бессарабка" } },
               },
               sector: { id: 701, translations: { ru: { name: "Центр" } } },
+              schedule: {
+                monday: { from: "08:00", to: "20:00" },
+                tuesday: { from: "08:00", to: "20:00" },
+                wednesday: { from: "08:00", to: "20:00" },
+                thursday: { from: "08:00", to: "20:00" },
+                friday: { from: "08:00", to: "20:00" },
+                saturday: { from: "09:00", to: "18:00" },
+                sunday: { from: "09:00", to: "16:00" },
+              },
             },
           ],
         };
@@ -353,16 +433,23 @@ test("products checkout filters pickup pharmacies by region and sector and loads
   await page.locator("#products-cart-checkout").click();
   await page.locator('[data-checkout-action="next"]').click();
 
+  await expect(
+    page.locator("#products-checkout-flow-region"),
+  ).not.toContainText("No Pharmacy Region");
   await page.locator("#products-checkout-flow-region").selectOption("7");
   await expect(page.locator("#products-checkout-flow-sector")).toContainText(
     "Центр",
   );
-  await expect(page.locator("#products-checkout-flow-pharmacy")).toContainText(
-    "Аптека Бессарабка",
-  );
+  await expect(page.locator("#products-checkout-flow-pharmacy")).toBeHidden();
+  await expect(
+    page.locator("#products-checkout-flow-pharmacy-options"),
+  ).toContainText("Аптека Бессарабка");
+  await expect(
+    page.locator("#products-checkout-flow-pharmacy-options"),
+  ).toContainText("08:00-20:00");
   await expect(
     page.locator("#products-checkout-flow-delivery-windows"),
-  ).toContainText("14:00 - 20:00");
+  ).toContainText("20.07.2026 • 20:00");
 
   const calls = await page.evaluate(() => window.__KOKIKO_FETCH_CALLS__);
   expect(calls.map((call) => call.url)).toEqual(

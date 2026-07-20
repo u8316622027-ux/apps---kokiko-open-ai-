@@ -31,6 +31,7 @@
     cartCheckout,
     checkoutForm,
     checkoutBack,
+    checkoutPharmacy,
   } = dom;
 
   const scrollTrack = (direction) => {
@@ -108,9 +109,36 @@
     }
   });
 
-  checkoutForm?.addEventListener("change", () => {
+  checkoutForm?.addEventListener("change", (event) => {
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    if (
+      target instanceof HTMLInputElement &&
+      target.name === "products-delivery-window"
+    ) {
+      state.checkoutDeliveryWindowIndex = Number(target.value) || 0;
+      ui.renderCheckout();
+      return;
+    }
+    if (
+      target instanceof HTMLInputElement &&
+      target.name === "products-pharmacy-option"
+    ) {
+      if (checkoutPharmacy instanceof HTMLSelectElement) {
+        checkoutPharmacy.value = target.value;
+      }
+      state.checkoutDeliveryWindowIndex = 0;
+    }
+    if (
+      target instanceof HTMLSelectElement ||
+      (target instanceof HTMLInputElement &&
+        target.name === "products-delivery-method")
+    ) {
+      state.checkoutDeliveryWindowIndex = 0;
+    }
     ui.renderCheckout();
-    void actions.refreshCheckoutDeliveryData();
+    if (state.checkoutStep === "address") {
+      void actions.refreshCheckoutDeliveryData();
+    }
   });
 
   checkoutForm?.addEventListener("submit", (event) => {
