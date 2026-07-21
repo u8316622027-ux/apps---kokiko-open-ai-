@@ -682,6 +682,25 @@ test("products checkout keeps sector disabled until a region is selected", async
   await expect(sector).toHaveValue("");
   await expect(region).toHaveJSProperty("size", 0);
 
+  await page.locator("#products-checkout-flow-name").fill("Ana Popescu");
+  await page.locator("#products-checkout-flow-phone").fill("79703000");
+  await page.locator('[data-checkout-action="next"]').click();
+
+  await expect(page.locator("#products-checkout-flow-region")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+  await expect(page.locator("#products-checkout-flow-sector")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+  await expect(
+    page.locator("#products-checkout-flow-region-trigger"),
+  ).toHaveAttribute("data-invalid", "true");
+  await expect(
+    page.locator("#products-checkout-flow-sector-trigger"),
+  ).toHaveAttribute("data-invalid", "false");
+
   const callsBeforeRegion = await page.evaluate(() =>
     window.__KOKIKO_FETCH_CALLS__.map((call) => call.url),
   );
@@ -1124,6 +1143,8 @@ test("products widget submits checkout form through order tool", async ({
   await expect(page.locator("#products-cart-panel")).toHaveClass(/is-checkout/);
   await expect(page.locator("#products-cart-items")).toBeHidden();
   await expect(page.locator("#products-checkout-flow")).toBeVisible();
+  await expect(page.locator("#products-cart-title")).toBeHidden();
+  await expect(page.locator("#products-cart-close")).toBeVisible();
   await expect(page.locator('[data-checkout-step="delivery"]')).toBeVisible();
   await page.locator('#products-checkout-flow input[value="courier"]').check();
   await page.locator('[data-checkout-action="next"]').click();
@@ -1180,9 +1201,13 @@ test("products checkout validates Moldova phone mask and digits only", async ({
   await expect(page.locator("#products-checkout-flow-country")).toHaveValue(
     "MD",
   );
-  await expect(
-    page.locator("#products-checkout-flow-phone-mask"),
-  ).toContainText("+373 XX XXX XXX");
+  await expect(page.locator("#products-checkout-flow-phone-mask")).toHaveCount(
+    0,
+  );
+  await expect(page.locator("#products-checkout-flow-phone")).toHaveAttribute(
+    "placeholder",
+    "XX XXX XXX",
+  );
 
   const phone = page.locator("#products-checkout-flow-phone");
   await phone.fill("79abc703000!!");
@@ -1239,6 +1264,8 @@ test("products checkout only offers cash and card on delivery payment", async ({
   await page.locator('[data-checkout-action="next"]').click();
   await page.locator("#products-checkout-flow-name").fill("Ana Popescu");
   await page.locator("#products-checkout-flow-phone").fill("79703000");
+  await page.locator("#products-checkout-flow-region").selectOption("2");
+  await page.locator("#products-checkout-flow-sector").selectOption("1550");
   await page.locator('[data-checkout-action="next"]').click();
 
   const paymentValues = await page
@@ -1250,6 +1277,21 @@ test("products checkout only offers cash and card on delivery payment", async ({
   await expect(page.locator('input[value="cashless_individual"]')).toHaveCount(
     0,
   );
+
+  await expect(page.locator('[data-checkout-step="review"]')).toBeVisible();
+  const legendBox = await page
+    .locator(".products-payment-methods legend")
+    .boundingBox();
+  const firstLabelBox = await page
+    .locator(".products-payment-methods label")
+    .first()
+    .boundingBox();
+  expect(legendBox).not.toBeNull();
+  expect(firstLabelBox).not.toBeNull();
+  if (legendBox && firstLabelBox) {
+    const gap = firstLabelBox.y - (legendBox.y + legendBox.height);
+    expect(gap).toBeGreaterThanOrEqual(8);
+  }
 });
 
 test("products checkout validates required pickup address fields", async ({

@@ -609,6 +609,15 @@ body {
   max-height: min(760px, calc(100vh - 24px));
 }
 
+.products-cart-panel.is-checkout .products-cart-header {
+  justify-content: flex-end;
+  padding-bottom: 8px;
+}
+
+.products-cart-panel.is-checkout .products-cart-header-text {
+  display: none;
+}
+
 .products-cart-header {
   display: flex;
   align-items: flex-start;
@@ -916,12 +925,6 @@ body {
   padding-inline: 10px 8px;
   font-weight: 800;
   white-space: nowrap;
-}
-
-.products-phone-mask {
-  color: var(--kokiko-text-secondary);
-  font-size: 12px;
-  line-height: 1.3;
 }
 
 .products-checkout-field textarea {
@@ -1370,6 +1373,7 @@ body {
 
 .products-payment-methods legend {
   grid-column: 1 / -1;
+  margin-bottom: 10px;
 }
 
 .products-payment-methods label {

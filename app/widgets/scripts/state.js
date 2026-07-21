@@ -61,9 +61,6 @@
     const checkoutPhone = document.getElementById(
       "products-checkout-flow-phone",
     );
-    const checkoutPhoneMask = document.getElementById(
-      "products-checkout-flow-phone-mask",
-    );
     const checkoutCity = document.getElementById("products-checkout-flow-city");
     const checkoutAddress = document.getElementById(
       "products-checkout-flow-address",
@@ -659,7 +656,6 @@
         checkoutName,
         checkoutCountry,
         checkoutPhone,
-        checkoutPhoneMask,
         checkoutCity,
         checkoutAddress,
         checkoutComment,

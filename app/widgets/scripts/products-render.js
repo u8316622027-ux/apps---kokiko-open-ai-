@@ -20,7 +20,6 @@
       checkoutName,
       checkoutCountry,
       checkoutPhone,
-      checkoutPhoneMask,
       checkoutCity,
       checkoutAddress,
       checkoutComment,
@@ -137,7 +136,6 @@
           phoneCountryMoldova: "Moldova",
           phoneLengthError:
             "Introduceți numărul Moldovei: 8 cifre după +373, de exemplu 79 703 000.",
-          phoneMaskHint: "+373 XX XXX XXX",
           phonePrefixError:
             "Introduceți un număr mobil valid din Moldova, de exemplu 79 703 000.",
           pickup: "Ridicare personală",
@@ -210,7 +208,6 @@
         phoneCountryMoldova: "Молдова",
         phoneLengthError:
           "Введите молдавский номер: 8 цифр после +373, например 79 703 000.",
-        phoneMaskHint: "+373 XX XXX XXX",
         phonePrefixError:
           "Введите корректный мобильный номер Молдовы, например 79 703 000.",
         pickup: "Самовывоз",
@@ -871,7 +868,9 @@
         state.orderSubmitted;
       trigger.dataset.placeholder = select.value ? "false" : "true";
       trigger.dataset.invalid =
-        select.getAttribute("aria-invalid") === "true" ? "true" : "false";
+        select.getAttribute("aria-invalid") === "true" && !trigger.disabled
+          ? "true"
+          : "false";
       trigger.setAttribute("aria-expanded", String(isOpen));
       trigger.setAttribute("aria-controls", menu.id);
       menu.hidden = !isOpen;
@@ -1688,14 +1687,10 @@
     };
 
     const renderCheckoutPhoneMask = () => {
-      const copy = getUiCopy();
       const country = getSelectedPhoneCountry();
       if (checkoutPhone instanceof HTMLInputElement) {
         checkoutPhone.placeholder = country.mask;
         checkoutPhone.removeAttribute("maxlength");
-      }
-      if (checkoutPhoneMask instanceof HTMLElement) {
-        checkoutPhoneMask.textContent = copy.phoneMaskHint;
       }
     };
 
