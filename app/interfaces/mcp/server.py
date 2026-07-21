@@ -17,6 +17,7 @@ from pathlib import Path
 from time import monotonic as _monotonic
 from time import perf_counter as _perf_counter
 from typing import Any, Mapping
+from urllib.parse import unquote, urlsplit
 from uuid import uuid4
 
 from app.core.config import get_settings
@@ -690,6 +691,30 @@ def _inline_local_widget_assets(html_text: str, *, widget_dir: Path) -> str:
     return _WIDGET_SCRIPT_SRC_PATTERN.sub(_replace_js, with_inlined_css)
 
 
+def _read_widget_http_resource(path: str) -> str | None:
+    requested_path = unquote(urlsplit(path).path).lstrip("/")
+    if not requested_path:
+        return None
+
+    for resource_data in _widget_resource_index().values():
+        allowed_paths = {
+            str(resource_data.get("name") or "").strip(),
+            str(resource_data.get("path") or "").strip(),
+        }
+        if requested_path not in allowed_paths:
+            continue
+
+        relative_path = str(resource_data["path"])
+        file_path = Path(__file__).resolve().parents[2] / "widgets" / relative_path
+        try:
+            html_text = file_path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return None
+        return _inline_local_widget_assets(html_text, widget_dir=file_path.parent)
+
+    return None
+
+
 def _sanitize_user_agent(user_agent: str) -> str:
     cleaned = re.sub(r"[\r\n\t]+", " ", user_agent).strip()
     max_length = 120
@@ -757,6 +782,13 @@ class MCPHttpHandler(BaseHTTPRequestHandler):
             return
         if self.path == "/metrics":
             self._send_json(get_runtime_metrics(), request_id=request_id)
+            self._log_access(
+                request_id=request_id, status_code=HTTPStatus.OK, started_at=started_at
+            )
+            return
+        widget_html = _read_widget_http_resource(self.path)
+        if widget_html is not None:
+            self._send_html(widget_html, request_id=request_id)
             self._log_access(
                 request_id=request_id, status_code=HTTPStatus.OK, started_at=started_at
             )
@@ -882,6 +914,23 @@ class MCPHttpHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(encoded)))
+        if should_compress:
+            self.send_header("Content-Encoding", "gzip")
+            self.send_header("Vary", "Accept-Encoding")
+        if request_id:
+            self.send_header("X-Request-Id", request_id)
+        self.end_headers()
+        self.wfile.write(encoded)
+
+    def _send_html(self, html_text: str, *, request_id: str | None = None) -> None:
+        encoded = html_text.encode("utf-8")
+        should_compress = self._should_use_gzip(len(encoded))
+        if should_compress:
+            encoded = gzip.compress(encoded, compresslevel=5)
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/html;profile=mcp-app; charset=utf-8")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.send_header("Cache-Control", "no-store")
         if should_compress:
             self.send_header("Content-Encoding", "gzip")
             self.send_header("Vary", "Accept-Encoding")

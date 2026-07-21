@@ -268,6 +268,23 @@ def test_get_health_still_returns_ok() -> None:
     assert payload == {"status": "ok"}
 
 
+def test_get_cache_busted_widget_template_returns_html() -> None:
+    server, thread, host, port = _start_mcp_server()
+    try:
+        status, headers, body = _http_request(
+            host=host, port=port, method="GET", path="/products-v2.html"
+        )
+    finally:
+        _stop_mcp_server(server, thread)
+
+    text = body.decode("utf-8")
+    assert status == HTTPStatus.OK
+    assert headers["Content-Type"] == "text/html;profile=mcp-app; charset=utf-8"
+    assert headers["Cache-Control"] == "no-store"
+    assert "products-checkout-flow-region-trigger" in text
+    assert "+373" in text
+
+
 def test_log_mcp_request_safe_includes_error_message(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
