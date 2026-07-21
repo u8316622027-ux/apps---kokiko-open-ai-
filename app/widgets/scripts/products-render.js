@@ -48,6 +48,7 @@
       computeDiscount,
       getProductPrice,
       writeStoredCart,
+      writeStoredCartToken,
       getCartCount,
       getCartTotal,
       getFallbackImage,
@@ -299,6 +300,7 @@
           minOrderTotal: "Suma minimă a comenzii este 30 MDL.",
           next: "Continuă",
           submit: "Finalizează",
+          syncing: "Se sincronizează coșul...",
         };
       }
       return {
@@ -313,6 +315,7 @@
         minOrderTotal: "Минимальная сумма заказа 30 MDL.",
         next: "Продолжить",
         submit: "Оформить",
+        syncing: "Синхронизируем корзину...",
       };
     };
 
@@ -501,9 +504,10 @@
         payload.cart && typeof payload.cart === "object" ? payload.cart : {};
       if (normalizeText(cart.token)) {
         state.cartToken = normalizeText(cart.token);
+        writeStoredCartToken(state.cartToken);
       }
       if (!Array.isArray(cart.items)) {
-        return;
+        return cart;
       }
       state.cartItems = cart.items
         .map((item) => {
@@ -538,6 +542,7 @@
         })
         .filter(Boolean);
       persistAndRenderCart();
+      return cart;
     };
 
     const nextCartMutationSerial = () => {
@@ -547,7 +552,7 @@
 
     const callCartTool = async (name, args, mutationSerial) => {
       if (typeof window.openai?.callTool !== "function") {
-        return;
+        return undefined;
       }
       try {
         const toolResult = await window.openai.callTool(name, args);
@@ -557,15 +562,35 @@
             mutationSerial,
             currentMutationSerial: state.cartMutationSerial,
           });
-          return;
+          return undefined;
         }
-        applyCartToolResult(toolResult);
+        return applyCartToolResult(toolResult);
       } catch (error) {
         debugLog("cart_tool_error", {
           tool: name,
           message: String(error?.message ? error.message : error),
           level: "warn",
         });
+        return undefined;
+      }
+    };
+
+    const ensureCartSession = async () => {
+      if (typeof window.openai?.callTool !== "function") {
+        return;
+      }
+      const mutationSerial = nextCartMutationSerial();
+      const result = await callCartTool(
+        "sync_cart",
+        { cart: getCartPayload(), language: getActiveLanguage() },
+        mutationSerial,
+      );
+      if (mutationSerial !== state.cartMutationSerial) {
+        return;
+      }
+      if (!result || result.synced !== true) {
+        state.cartItems = [];
+        persistAndRenderCart();
       }
     };
 
@@ -1524,6 +1549,20 @@
       }
     };
 
+    const reconcileCartBeforeReview = async () => {
+      const copy = getCheckoutCopy();
+      state.isReconcilingCart = true;
+      renderCheckout();
+      const mutationSerial = nextCartMutationSerial();
+      await callCartTool(
+        "sync_cart",
+        { cart: getCartPayload(), language: getActiveLanguage() },
+        mutationSerial,
+      );
+      state.isReconcilingCart = false;
+      setCheckoutStep(copy.reviewStep);
+    };
+
     const nextCheckoutStep = () => {
       const copy = getCheckoutCopy();
       const payload = buildOrderPayload();
@@ -1540,7 +1579,7 @@
           setCheckoutStatus(validationError, "error");
           return;
         }
-        setCheckoutStep(copy.reviewStep);
+        void reconcileCartBeforeReview();
       }
     };
 
@@ -2034,6 +2073,7 @@
         state.orderSubmitted = true;
         state.checkoutOpen = true;
         writeStoredCart();
+        writeStoredCartToken("");
         renderCart();
         renderProducts();
         setCheckoutStatus(
@@ -2410,18 +2450,24 @@
       );
       if (nextButton instanceof HTMLButtonElement) {
         nextButton.hidden = state.checkoutStep === getCheckoutCopy().reviewStep;
-        nextButton.disabled = state.isSubmittingOrder;
-        nextButton.textContent = getCheckoutCopy().next;
+        nextButton.disabled =
+          state.isSubmittingOrder || state.isReconcilingCart;
+        nextButton.textContent = state.isReconcilingCart
+          ? getCheckoutCopy().syncing
+          : getCheckoutCopy().next;
       }
       if (checkoutBack instanceof HTMLButtonElement) {
-        checkoutBack.disabled = state.isSubmittingOrder;
+        checkoutBack.disabled =
+          state.isSubmittingOrder || state.isReconcilingCart;
         checkoutBack.textContent = getUiCopy().back;
       }
       if (orderSubmit instanceof HTMLButtonElement) {
         orderSubmit.hidden =
           state.checkoutStep !== getCheckoutCopy().reviewStep;
         orderSubmit.disabled =
-          state.isSubmittingOrder || !state.cartItems.length;
+          state.isSubmittingOrder ||
+          state.isReconcilingCart ||
+          !state.cartItems.length;
         orderSubmit.textContent = state.isSubmittingOrder
           ? getCartCopy().sending
           : getCheckoutCopy().submit;
@@ -2692,6 +2738,7 @@
     ctx.actions.setCheckoutStep = setCheckoutStep;
     ctx.actions.refreshCheckoutDeliveryData = refreshCheckoutDeliveryData;
     ctx.actions.submitOrder = submitOrder;
+    ctx.tools.ensureCartSession = ensureCartSession;
   };
 
   window.ProductsRender = {

@@ -134,14 +134,23 @@ test("products widget syncs cart actions through cart tools", async ({
 
   await page.locator('[data-action="add-to-cart"]').click();
   await expect
-    .poll(() => page.evaluate(() => window.__KOKIKO_CART_CALLS__.length))
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__KOKIKO_CART_CALLS__.filter(
+            (call) => call.name !== "sync_cart",
+          ).length,
+      ),
+    )
     .toBe(1);
 
   await page.locator("#products-cart-button").click();
   await page.getByRole("button", { name: /increase/i }).click();
   await page.getByRole("button", { name: /remove/i }).click();
 
-  const calls = await page.evaluate(() => window.__KOKIKO_CART_CALLS__);
+  const calls = (
+    await page.evaluate(() => window.__KOKIKO_CART_CALLS__)
+  ).filter((call) => call.name !== "sync_cart");
   expect(calls.map((call) => call.name)).toEqual([
     "add_to_cart",
     "update_cart_item",
@@ -264,6 +273,137 @@ test("products widget does not resurrect removed items from stale add response",
   );
 });
 
+test("products widget bootstraps a cart token on mount", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__KOKIKO_SYNC_CALLS__ = [];
+    window.openai = {
+      callTool: async (name, args) => {
+        window.__KOKIKO_SYNC_CALLS__.push({ name, args });
+        return {
+          structuredContent: {
+            cart: { token: "bootstrap-token-1", synced: true, items: [] },
+          },
+        };
+      },
+    };
+  });
+  await openWidgetWithProduct(page);
+
+  await expect
+    .poll(() => page.evaluate(() => window.__KOKIKO_SYNC_CALLS__.length))
+    .toBeGreaterThan(0);
+
+  const calls = await page.evaluate(() => window.__KOKIKO_SYNC_CALLS__);
+  expect(calls[0].name).toBe("sync_cart");
+
+  const storedToken = await page.evaluate(() =>
+    window.localStorage.getItem("kokiko_widget_cart_token"),
+  );
+  expect(storedToken).toBe("bootstrap-token-1");
+});
+
+test("products widget clears stale local cart items when no token is persisted", async ({
+  page,
+}) => {
+  const htmlPath = path.resolve(process.cwd(), "app/widgets/products.html");
+  const htmlUrl = `file:///${htmlPath.replace(/\\/g, "/")}`;
+
+  await page.addInitScript(() => {
+    window.localStorage.clear();
+    window.localStorage.setItem(
+      "kokiko_widget_cart",
+      JSON.stringify([
+        { id: "cream-1", name: "Face cream", price: 99, quantity: 2 },
+      ]),
+    );
+  });
+
+  await page.goto(htmlUrl, { waitUntil: "domcontentloaded" });
+
+  const cartCount = await page.locator("#products-cart-count").textContent();
+  expect(cartCount).toBe("0");
+  const storedCart = await page.evaluate(() =>
+    window.localStorage.getItem("kokiko_widget_cart"),
+  );
+  expect(JSON.parse(storedCart || "[]")).toEqual([]);
+});
+
+test("products widget keeps a persisted cart when the mount sync confirms it", async ({
+  page,
+}) => {
+  const htmlPath = path.resolve(process.cwd(), "app/widgets/products.html");
+  const htmlUrl = `file:///${htmlPath.replace(/\\/g, "/")}`;
+
+  await page.addInitScript(() => {
+    window.localStorage.clear();
+    window.localStorage.setItem("kokiko_widget_cart_token", "existing-token");
+    window.localStorage.setItem(
+      "kokiko_widget_cart",
+      JSON.stringify([
+        { id: "26078", name: "Shampoo", price: 57.27, quantity: 1 },
+      ]),
+    );
+    window.__APTEKA_WIDGET_PAYLOAD__ = {
+      language: "ru",
+      query: "cream",
+      products: [],
+    };
+    window.openai = {
+      callTool: async (name, args) => ({
+        structuredContent: {
+          cart: {
+            token: "existing-token",
+            synced: true,
+            items: Array.isArray(args?.cart?.items) ? args.cart.items : [],
+          },
+        },
+      }),
+    };
+  });
+
+  await page.goto(htmlUrl, { waitUntil: "domcontentloaded" });
+
+  await expect(page.locator("#products-cart-count")).toContainText("1");
+});
+
+test("products widget clears a persisted cart when the mount sync reports it unsynced", async ({
+  page,
+}) => {
+  const htmlPath = path.resolve(process.cwd(), "app/widgets/products.html");
+  const htmlUrl = `file:///${htmlPath.replace(/\\/g, "/")}`;
+
+  await page.addInitScript(() => {
+    window.localStorage.clear();
+    window.localStorage.setItem("kokiko_widget_cart_token", "existing-token");
+    window.localStorage.setItem(
+      "kokiko_widget_cart",
+      JSON.stringify([
+        { id: "26078", name: "Shampoo", price: 57.27, quantity: 1 },
+      ]),
+    );
+    window.__APTEKA_WIDGET_PAYLOAD__ = {
+      language: "ru",
+      query: "cream",
+      products: [],
+    };
+    window.openai = {
+      callTool: async (name, args) => ({
+        structuredContent: {
+          cart: {
+            token: "existing-token",
+            synced: false,
+            items: Array.isArray(args?.cart?.items) ? args.cart.items : [],
+          },
+        },
+      }),
+    };
+  });
+
+  await page.goto(htmlUrl, { waitUntil: "domcontentloaded" });
+
+  await expect(page.locator("#products-cart-count")).toContainText("0");
+});
+
 test("products cart keeps checkout out of the cart list scroll", async ({
   page,
 }) => {
@@ -334,6 +474,71 @@ test("products widget applies dark theme and Romanian language payload", async (
     "Cumpără",
   );
   await expect(page.locator(".product-title")).toContainText("Cremă de față");
+});
+
+test("products widget defaults to Romanian for unrecognized ChatGPT locales", async ({
+  page,
+}) => {
+  const htmlPath = path.resolve(process.cwd(), "app/widgets/products.html");
+  const htmlUrl = `file:///${htmlPath.replace(/\\/g, "/")}`;
+
+  await page.addInitScript(() => {
+    window.localStorage.clear();
+    window.openai = { locale: "en-US" };
+    window.__APTEKA_WIDGET_PAYLOAD__ = {
+      query: "cream",
+      products: [
+        {
+          id: "cream-1",
+          name_ru: "Крем",
+          name_ro: "Cremă de față",
+          manufacturer: "Kokiko",
+          price: 120,
+          discount_price: 99,
+          image: "",
+          slug_ro: "crema-de-fata",
+        },
+      ],
+    };
+  });
+
+  await page.goto(htmlUrl, { waitUntil: "domcontentloaded" });
+
+  await expect(page.locator('[data-action="add-to-cart"]')).toContainText(
+    "Cumpără",
+  );
+});
+
+test("products widget uses Russian copy for a Russian ChatGPT locale", async ({
+  page,
+}) => {
+  const htmlPath = path.resolve(process.cwd(), "app/widgets/products.html");
+  const htmlUrl = `file:///${htmlPath.replace(/\\/g, "/")}`;
+
+  await page.addInitScript(() => {
+    window.localStorage.clear();
+    window.openai = { locale: "ru-RU" };
+    window.__APTEKA_WIDGET_PAYLOAD__ = {
+      query: "cream",
+      products: [
+        {
+          id: "cream-1",
+          name_ru: "Крем",
+          manufacturer: "Kokiko",
+          price: 120,
+          discount_price: 99,
+          image: "",
+          slug_ru: "krem",
+        },
+      ],
+    };
+  });
+
+  await page.goto(htmlUrl, { waitUntil: "domcontentloaded" });
+
+  await expect(page.locator('[data-action="add-to-cart"]')).toContainText(
+    "Купить",
+  );
 });
 
 test("products widget keeps manually selected language after reload", async ({
@@ -1192,6 +1397,69 @@ test("products widget submits checkout form through order tool", async ({
   expect(submitCall.args.building).toBe("1");
   expect(submitCall.args.payment_method).toBe("cash");
   expect(submitCall.args.items[0].id).toBe("cream-1");
+});
+
+test("products checkout re-syncs cart on every entry into the review step", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.__KOKIKO_SYNC_CALLS__ = [];
+    window.openai = {
+      callTool: async (name, args) => {
+        if (name === "sync_cart") {
+          window.__KOKIKO_SYNC_CALLS__.push({ name, args });
+        }
+        const items = Array.isArray(args?.cart?.items) ? args.cart.items : [];
+        const product = args?.product
+          ? {
+              ...args.product,
+              quantity: args.quantity || args.product.quantity || 1,
+            }
+          : null;
+        const nextItems =
+          name === "add_to_cart" && product ? items.concat(product) : items;
+        return {
+          structuredContent: {
+            cart: {
+              token: "review-sync-token",
+              synced: true,
+              items: nextItems,
+            },
+          },
+        };
+      },
+    };
+  });
+  await openWidgetWithProduct(page);
+
+  await expect
+    .poll(() => page.evaluate(() => window.__KOKIKO_SYNC_CALLS__.length))
+    .toBe(1);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+  await page.locator('#products-checkout-flow input[value="pickup"]').check();
+  await page.locator('[data-checkout-action="next"]').click();
+  await page.locator("#products-checkout-flow-name").fill("Ana Popescu");
+  await page.locator("#products-checkout-flow-phone").fill("79703000");
+  await page.locator("#products-checkout-flow-region").selectOption("2");
+  await page.locator("#products-checkout-flow-sector").selectOption("1550");
+  await page.locator('[data-checkout-action="next"]').click();
+
+  await expect(page.locator('[data-checkout-step="review"]')).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => window.__KOKIKO_SYNC_CALLS__.length))
+    .toBe(2);
+
+  await page.locator("#products-checkout-flow-back").click();
+  await expect(page.locator('[data-checkout-step="address"]')).toBeVisible();
+  await page.locator('[data-checkout-action="next"]').click();
+
+  await expect(page.locator('[data-checkout-step="review"]')).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => window.__KOKIKO_SYNC_CALLS__.length))
+    .toBe(3);
 });
 
 test("products checkout validates Moldova phone mask and digits only", async ({

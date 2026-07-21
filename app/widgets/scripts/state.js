@@ -4,6 +4,7 @@
     const INITIAL_PAYLOAD_POLL_MS = 140;
     const FALLBACK_IMAGE_PATH = "/assets/images/placeholder-600x600.png";
     const CART_STORAGE_KEY = "kokiko_widget_cart";
+    const CART_TOKEN_STORAGE_KEY = "kokiko_widget_cart_token";
     const LANGUAGE_STORAGE_KEY = "kokiko_widget_language";
 
     const state = {
@@ -28,6 +29,7 @@
       checkoutDeliveryWindows: [],
       checkoutDeliveryWindowIndex: 0,
       isSubmittingOrder: false,
+      isReconcilingCart: false,
       orderSubmitted: false,
       lastQuery: "",
       apiBaseUrl: "",
@@ -277,17 +279,24 @@
       }
     };
 
-    const getPreferredLanguage = () => {
-      const docLang = normalizeLanguage(document.documentElement?.lang);
-      if (docLang) {
-        return docLang;
-      }
-      const navLang = normalizeLanguage(window.navigator?.language);
-      if (navLang) {
-        return navLang;
+    const resolveHostLocale = () => {
+      const candidates = [
+        window.openai?.locale,
+        window.openai?.user?.locale,
+        window.openai?.preferences?.locale,
+        window.__OPENAI_LOCALE__,
+        document.documentElement?.lang,
+        window.navigator?.language,
+      ];
+      for (const candidate of candidates) {
+        const normalized = normalizeText(candidate).toLowerCase();
+        if (normalized) {
+          return normalized.startsWith("ru") ? "ru" : "ro";
+        }
       }
       return "ru";
     };
+    const getPreferredLanguage = () => resolveHostLocale();
     const getActiveLanguage = (candidate) =>
       normalizeLanguage(candidate) ||
       normalizeLanguage(state.language) ||
@@ -613,6 +622,29 @@
       }
     };
 
+    const readStoredCartToken = () => {
+      try {
+        return normalizeText(
+          window.localStorage.getItem(CART_TOKEN_STORAGE_KEY),
+        );
+      } catch (_error) {
+        return "";
+      }
+    };
+
+    const writeStoredCartToken = (token) => {
+      try {
+        const normalized = normalizeText(token);
+        if (normalized) {
+          window.localStorage.setItem(CART_TOKEN_STORAGE_KEY, normalized);
+        } else {
+          window.localStorage.removeItem(CART_TOKEN_STORAGE_KEY);
+        }
+      } catch (_error) {
+        // ignore storage write errors
+      }
+    };
+
     const getCartCount = () =>
       state.cartItems.reduce((total, item) => total + item.quantity, 0);
 
@@ -623,6 +655,11 @@
       );
 
     state.cartItems = readStoredCart();
+    state.cartToken = readStoredCartToken();
+    if (!state.cartToken) {
+      state.cartItems = [];
+      writeStoredCart();
+    }
 
     return {
       root,
@@ -631,6 +668,7 @@
         INITIAL_PAYLOAD_WAIT_MS,
         INITIAL_PAYLOAD_POLL_MS,
         CART_STORAGE_KEY,
+        CART_TOKEN_STORAGE_KEY,
         LANGUAGE_STORAGE_KEY,
       },
       dom: {
@@ -713,6 +751,7 @@
       },
       tools: {
         waitForInitialPayload: () => Promise.resolve(false),
+        ensureCartSession: () => Promise.resolve(),
       },
       utils: {
         normalizeText,
@@ -734,6 +773,8 @@
         mapProduct,
         normalizeCartQuantity,
         writeStoredCart,
+        readStoredCartToken,
+        writeStoredCartToken,
         getCartCount,
         getCartTotal,
       },

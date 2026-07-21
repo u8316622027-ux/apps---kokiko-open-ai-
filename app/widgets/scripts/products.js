@@ -358,5 +358,6 @@
     }
     ui.renderCart();
     ui.updateCarouselControls();
+    void tools.ensureCartSession();
   });
 })();
