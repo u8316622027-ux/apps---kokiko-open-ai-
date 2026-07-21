@@ -3,28 +3,30 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
-const openWidgetWithProduct = async (page) => {
+const DEFAULT_PRODUCTS = [
+  {
+    id: "cream-1",
+    name_ru: "Face cream",
+    manufacturer: "Kokiko",
+    price: 120,
+    discount_price: 99,
+    image: "",
+    slug_ru: "face-cream",
+  },
+];
+
+const openWidgetWithProduct = async (page, products = DEFAULT_PRODUCTS) => {
   const htmlPath = path.resolve(process.cwd(), "app/widgets/products.html");
   const htmlUrl = `file:///${htmlPath.replace(/\\/g, "/")}`;
 
-  await page.addInitScript(() => {
+  await page.addInitScript((seedProducts) => {
     window.localStorage.clear();
     window.__APTEKA_WIDGET_PAYLOAD__ = {
       language: "ru",
       query: "cream",
-      products: [
-        {
-          id: "cream-1",
-          name_ru: "Face cream",
-          manufacturer: "Kokiko",
-          price: 120,
-          discount_price: 99,
-          image: "",
-          slug_ru: "face-cream",
-        },
-      ],
+      products: seedProducts,
     };
-  });
+  }, products);
 
   await page.goto(htmlUrl, { waitUntil: "domcontentloaded" });
 };
@@ -562,7 +564,7 @@ test("products checkout delivery step matches Kokiko card mechanics", async ({
   expect(Number.parseFloat(cardStyle.minHeight)).toBeLessThanOrEqual(112);
 });
 
-test("products checkout keeps native selects compact inside the app panel", async ({
+test("products checkout opens custom selects inside the app panel", async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -588,22 +590,36 @@ test("products checkout keeps native selects compact inside the app panel", asyn
   await page.locator('[data-action="add-to-cart"]').click();
   await page.locator("#products-cart-button").click();
   await page.locator("#products-cart-checkout").click();
-  await page.locator('#products-checkout-flow input[value="pickup"]').check();
+  await page.locator('#products-checkout-flow input[value="courier"]').check();
   await page.locator('[data-checkout-action="next"]').click();
-  await page.locator("#products-checkout-flow-region").focus();
+  await page.locator("#products-checkout-flow-region-trigger").click();
 
-  await expect(page.locator("#products-checkout-flow-region")).toHaveJSProperty(
-    "size",
-    0,
+  const menu = page.locator(
+    '[data-select-for="products-checkout-flow-region"]',
   );
+  await expect(menu).toBeVisible();
   const boxes = await page.evaluate(() => {
     const panel = document.getElementById("products-cart-panel");
-    const select = document.getElementById("products-checkout-flow-region");
+    const menu = document.querySelector(
+      '[data-select-for="products-checkout-flow-region"]',
+    );
     const panelBox = panel.getBoundingClientRect();
-    const selectBox = select.getBoundingClientRect();
-    return { panelBottom: panelBox.bottom, selectBottom: selectBox.bottom };
+    const menuBox = menu.getBoundingClientRect();
+    return {
+      panelLeft: panelBox.left,
+      panelRight: panelBox.right,
+      panelTop: panelBox.top,
+      panelBottom: panelBox.bottom,
+      menuLeft: menuBox.left,
+      menuRight: menuBox.right,
+      menuTop: menuBox.top,
+      menuBottom: menuBox.bottom,
+    };
   });
-  expect(boxes.selectBottom).toBeLessThanOrEqual(boxes.panelBottom);
+  expect(boxes.menuLeft).toBeGreaterThanOrEqual(boxes.panelLeft);
+  expect(boxes.menuRight).toBeLessThanOrEqual(boxes.panelRight);
+  expect(boxes.menuTop).toBeGreaterThanOrEqual(boxes.panelTop);
+  expect(boxes.menuBottom).toBeLessThanOrEqual(boxes.panelBottom);
 });
 
 test("products checkout keeps sector disabled until a region is selected", async ({
@@ -687,7 +703,7 @@ test("products checkout keeps sector disabled until a region is selected", async
   ).toContainText("13:00 - 15:00");
 });
 
-test("products checkout uses native select picker on mobile", async ({
+test("products checkout uses bounded custom select picker on mobile", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 640 });
@@ -714,14 +730,28 @@ test("products checkout uses native select picker on mobile", async ({
   await page.locator('[data-action="add-to-cart"]').click();
   await page.locator("#products-cart-button").click();
   await page.locator("#products-cart-checkout").click();
-  await page.locator('#products-checkout-flow input[value="pickup"]').check();
+  await page.locator('#products-checkout-flow input[value="courier"]').check();
   await page.locator('[data-checkout-action="next"]').click();
-  await page.locator("#products-checkout-flow-region").focus();
+  await page.locator("#products-checkout-flow-region-trigger").click();
 
-  await expect(page.locator("#products-checkout-flow-region")).toHaveJSProperty(
-    "size",
-    0,
-  );
+  const metrics = await page.evaluate(() => {
+    const panel = document.getElementById("products-cart-panel");
+    const menu = document.querySelector(
+      '[data-select-for="products-checkout-flow-region"]',
+    );
+    const panelBox = panel.getBoundingClientRect();
+    const menuBox = menu.getBoundingClientRect();
+    return {
+      viewport: window.innerWidth,
+      menuLeft: menuBox.left,
+      menuRight: menuBox.right,
+      menuBottom: menuBox.bottom,
+      panelBottom: panelBox.bottom,
+    };
+  });
+  expect(metrics.menuLeft).toBeGreaterThanOrEqual(0);
+  expect(metrics.menuRight).toBeLessThanOrEqual(metrics.viewport);
+  expect(metrics.menuBottom).toBeLessThanOrEqual(metrics.panelBottom);
 });
 
 test("products checkout courier time slots stay compact in the modal", async ({
@@ -1101,6 +1131,8 @@ test("products widget submits checkout form through order tool", async ({
   await expect(page.locator('[data-checkout-step="address"]')).toBeVisible();
   await page.locator("#products-checkout-flow-name").fill("Ana Popescu");
   await page.locator("#products-checkout-flow-phone").fill("79703000");
+  await page.locator("#products-checkout-flow-region").selectOption("2");
+  await page.locator("#products-checkout-flow-sector").selectOption("1550");
   await page.locator("#products-checkout-flow-street").fill("str. Alecu Russo");
   await page.locator("#products-checkout-flow-building").fill("1");
   await page
@@ -1158,6 +1190,8 @@ test("products checkout validates Moldova phone mask and digits only", async ({
 
   await phone.fill("12");
   await page.locator("#products-checkout-flow-name").fill("Ana Popescu");
+  await page.locator("#products-checkout-flow-region").selectOption("2");
+  await page.locator("#products-checkout-flow-sector").selectOption("1550");
   await page.locator('[data-checkout-action="next"]').click();
   await expect(page.locator("#products-checkout-flow-status")).toContainText(
     /8 цифр|8 digits/,
@@ -1167,6 +1201,30 @@ test("products checkout validates Moldova phone mask and digits only", async ({
   await expect(phone).toHaveValue("79 703 000");
   await page.locator('[data-checkout-action="next"]').click();
   await expect(page.locator('[data-checkout-step="review"]')).toBeVisible();
+});
+
+test("products checkout phone can be edited from the middle", async ({
+  page,
+}) => {
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+  await page.locator('#products-checkout-flow input[value="pickup"]').check();
+  await page.locator('[data-checkout-action="next"]').click();
+
+  const phone = page.locator("#products-checkout-flow-phone");
+  await phone.fill("79703000");
+  await expect(phone).toHaveValue("79 703 000");
+  await phone.evaluate((input) => {
+    input.setSelectionRange(3, 4);
+  });
+  await page.keyboard.type("8");
+
+  await expect(phone).toHaveValue("79 803 000");
+  const selection = await phone.evaluate((input) => input.selectionStart);
+  expect(selection).toBeLessThan("79 803 000".length);
 });
 
 test("products checkout only offers cash and card on delivery payment", async ({
@@ -1191,6 +1249,124 @@ test("products checkout only offers cash and card on delivery payment", async ({
   await expect(page.locator('input[value="mia"]')).toHaveCount(0);
   await expect(page.locator('input[value="cashless_individual"]')).toHaveCount(
     0,
+  );
+});
+
+test("products checkout validates required pickup address fields", async ({
+  page,
+}) => {
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+  await page.locator('#products-checkout-flow input[value="pickup"]').check();
+  await page.locator('[data-checkout-action="next"]').click();
+  await page.locator('[data-checkout-action="next"]').click();
+
+  await expect(page.locator("#products-checkout-flow-status")).toContainText(
+    /Заполните обязательные поля/,
+  );
+  await expect(page.locator("#products-checkout-flow-name")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+  await expect(page.locator("#products-checkout-flow-phone")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+  await expect(page.locator("#products-checkout-flow-region")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+  await expect(page.locator("#products-checkout-flow-sector")).toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
+});
+
+test("products checkout validates required courier address fields", async ({
+  page,
+}) => {
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+  await page.locator('#products-checkout-flow input[value="courier"]').check();
+  await page.locator('[data-checkout-action="next"]').click();
+  await page.locator("#products-checkout-flow-name").fill("Ana Popescu");
+  await page.locator("#products-checkout-flow-phone").fill("79703000");
+  await page.locator('[data-checkout-action="next"]').click();
+
+  await expect(page.locator("#products-checkout-flow-status")).toContainText(
+    /Заполните обязательные поля/,
+  );
+  for (const selector of [
+    "#products-checkout-flow-region",
+    "#products-checkout-flow-sector",
+    "#products-checkout-flow-street",
+    "#products-checkout-flow-building",
+  ]) {
+    await expect(page.locator(selector)).toHaveAttribute(
+      "aria-invalid",
+      "true",
+    );
+  }
+});
+
+test("products checkout validates minimum review total before submit", async ({
+  page,
+}) => {
+  await openWidgetWithProduct(page, [
+    {
+      id: "sample-1",
+      name_ru: "Sample",
+      manufacturer: "Kokiko",
+      price: 20,
+      discount_price: 20,
+      image: "",
+      slug_ru: "sample",
+    },
+  ]);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+  await page.locator('#products-checkout-flow input[value="pickup"]').check();
+  await page.locator('[data-checkout-action="next"]').click();
+  await page.locator("#products-checkout-flow-name").fill("Ana Popescu");
+  await page.locator("#products-checkout-flow-phone").fill("79703000");
+  await page.locator("#products-checkout-flow-region").selectOption("2");
+  await page.locator("#products-checkout-flow-sector").selectOption("1550");
+  await page.locator('[data-checkout-action="next"]').click();
+  await page.locator("#products-checkout-flow-consent").check();
+  await page.locator("#products-checkout-flow-submit").click();
+
+  await expect(page.locator("#products-checkout-flow-status")).toContainText(
+    /30 MDL/,
+  );
+});
+
+test("products checkout validates review consent before submit", async ({
+  page,
+}) => {
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+  await page.locator('#products-checkout-flow input[value="pickup"]').check();
+  await page.locator('[data-checkout-action="next"]').click();
+  await page.locator("#products-checkout-flow-name").fill("Ana Popescu");
+  await page.locator("#products-checkout-flow-phone").fill("79703000");
+  await page.locator("#products-checkout-flow-region").selectOption("2");
+  await page.locator("#products-checkout-flow-sector").selectOption("1550");
+  await page.locator('[data-checkout-action="next"]').click();
+  await page.locator("#products-checkout-flow-submit").click();
+
+  await expect(page.locator("#products-checkout-flow-status")).toContainText(
+    /согласие/,
   );
 });
 
@@ -1380,6 +1556,8 @@ test("products checkout review uses Kokiko summary layout and legal links", asyn
   await page.locator('[data-checkout-action="next"]').click();
   await page.locator("#products-checkout-flow-name").fill("Ana Popescu");
   await page.locator("#products-checkout-flow-phone").fill("079 802 000");
+  await page.locator("#products-checkout-flow-region").selectOption("2");
+  await page.locator("#products-checkout-flow-sector").selectOption("1550");
   await page.locator('[data-checkout-action="next"]').click();
 
   await expect(page.locator('[data-checkout-step="review"]')).toBeVisible();

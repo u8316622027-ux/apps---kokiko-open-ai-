@@ -873,6 +873,10 @@ body {
   gap: 5px;
 }
 
+.products-custom-select-field {
+  position: relative;
+}
+
 .products-checkout-field span,
 .products-checkout-delivery legend {
   color: var(--kokiko-text-secondary);
@@ -897,14 +901,21 @@ body {
 
 .products-phone-control {
   display: grid;
-  grid-template-columns: minmax(108px, 0.38fr) minmax(0, 1fr);
+  grid-template-columns: 112px minmax(0, 1fr);
   gap: 8px;
+  align-items: end;
   min-width: 0;
 }
 
 .products-phone-control select,
 .products-phone-control input {
   min-height: 44px;
+}
+
+.products-phone-control select {
+  padding-inline: 10px 8px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .products-phone-mask {
@@ -924,6 +935,108 @@ body {
   overflow-y: auto;
   position: relative;
   z-index: 3;
+}
+
+.products-native-select {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.products-select-trigger {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  border: 1px solid var(--kokiko-border-control);
+  border-radius: 4px;
+  background: var(--kokiko-bg-field);
+  color: var(--kokiko-text-main);
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.products-select-trigger::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+  opacity: 0.82;
+}
+
+.products-select-trigger[data-placeholder="true"] {
+  color: var(--kokiko-text-secondary);
+}
+
+.products-select-trigger[aria-expanded="true"],
+.products-select-trigger:focus-visible {
+  border-color: #00a99d;
+  box-shadow: 0 0 0 3px rgba(0, 169, 157, 0.16);
+  outline: none;
+}
+
+.products-select-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  background: var(--kokiko-bg-subtle);
+}
+
+.products-select-trigger[data-invalid="true"],
+.products-checkout-field [aria-invalid="true"],
+.products-checkout-consent input[aria-invalid="true"],
+.products-payment-methods[aria-invalid="true"] label {
+  border-color: var(--kokiko-sale);
+}
+
+.products-select-menu {
+  position: absolute;
+  z-index: 30;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  max-height: var(--products-select-menu-max-height, 220px);
+  overflow-y: auto;
+  border: 1px solid var(--kokiko-border-control);
+  border-radius: 6px;
+  background: var(--kokiko-bg-field);
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.24);
+}
+
+.products-select-menu[data-placement="above"] {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
+.products-select-option {
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  background: transparent;
+  color: var(--kokiko-text-main);
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.products-select-option:hover,
+.products-select-option:focus-visible,
+.products-select-option[aria-selected="true"] {
+  background: var(--kokiko-bg-selected);
+  outline: none;
 }
 
 .products-pharmacy-select {

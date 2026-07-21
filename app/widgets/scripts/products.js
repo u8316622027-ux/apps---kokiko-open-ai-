@@ -96,19 +96,34 @@
   });
 
   checkoutForm?.addEventListener("click", (event) => {
-    const target =
-      event.target instanceof Element
-        ? event.target.closest("[data-checkout-action]")
-        : null;
-    if (!(target instanceof HTMLElement)) {
+    const target = event.target instanceof Element ? event.target : null;
+    const selectOption = target?.closest("[data-select-option]");
+    if (selectOption instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      actions.chooseCheckoutSelect(
+        selectOption.dataset.selectOption || "",
+        selectOption.dataset.selectValue || "",
+      );
+      return;
+    }
+    const selectTrigger = target?.closest("[data-select-trigger]");
+    if (selectTrigger instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      actions.toggleCheckoutSelect(selectTrigger.dataset.selectTrigger || "");
+      return;
+    }
+    const checkoutAction = target?.closest("[data-checkout-action]");
+    if (!(checkoutAction instanceof HTMLElement)) {
       return;
     }
     event.preventDefault();
-    if (target.dataset.checkoutAction === "next") {
+    if (checkoutAction.dataset.checkoutAction === "next") {
       actions.nextCheckoutStep();
       return;
     }
-    if (target.dataset.checkoutAction === "back") {
+    if (checkoutAction.dataset.checkoutAction === "back") {
       actions.previousCheckoutStep();
     }
   });
@@ -151,6 +166,30 @@
 
   checkoutForm?.addEventListener("keydown", (event) => {
     const target = event.target instanceof HTMLElement ? event.target : null;
+    const selectTrigger = target?.closest("[data-select-trigger]");
+    if (
+      selectTrigger instanceof HTMLElement &&
+      (event.key === "Enter" || event.key === " " || event.key === "ArrowDown")
+    ) {
+      event.preventDefault();
+      actions.toggleCheckoutSelect(selectTrigger.dataset.selectTrigger || "");
+      return;
+    }
+    const selectOption = target?.closest("[data-select-option]");
+    if (
+      selectOption instanceof HTMLElement &&
+      (event.key === "Enter" || event.key === " ")
+    ) {
+      event.preventDefault();
+      actions.chooseCheckoutSelect(
+        selectOption.dataset.selectOption || "",
+        selectOption.dataset.selectValue || "",
+      );
+      return;
+    }
+    if (event.key === "Escape") {
+      actions.closeCheckoutSelect();
+    }
     if (
       target instanceof HTMLSelectElement &&
       (event.key === "Escape" || event.key === "Enter")
@@ -188,6 +227,7 @@
       (target instanceof HTMLInputElement &&
         target.name === "products-delivery-method")
     ) {
+      actions.closeCheckoutSelect();
       state.checkoutDeliveryWindowIndex = 0;
     }
     ui.renderCheckout();
@@ -199,8 +239,11 @@
     }
   });
 
-  checkoutPhone?.addEventListener("input", () => {
-    actions.formatCheckoutPhone();
+  checkoutPhone?.addEventListener("input", (event) => {
+    const target = event.target;
+    actions.formatCheckoutPhone(
+      target instanceof HTMLInputElement ? target.selectionStart : null,
+    );
   });
 
   checkoutForm?.addEventListener("submit", (event) => {
@@ -215,6 +258,13 @@
   cartLayer?.addEventListener("click", (event) => {
     if (event.target === cartLayer) {
       actions.closeCart();
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target?.closest(".products-custom-select-field")) {
+      actions.closeCheckoutSelect();
     }
   });
 
@@ -279,6 +329,7 @@
   window.addEventListener(
     "resize",
     () => {
+      actions.closeCheckoutSelect();
       for (const select of checkoutForm?.querySelectorAll(
         "select[data-expanded]",
       ) || []) {

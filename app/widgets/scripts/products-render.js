@@ -296,7 +296,10 @@
           reviewStep: "review",
           missingConsent: "Confirmați acordul cu termenii.",
           missingDelivery: "Alegeți metoda de livrare.",
+          missingPayment: "Alegeți metoda de plată.",
+          missingRequiredFields: "Completați câmpurile obligatorii",
           missingStreet: "Introduceți strada și numărul casei.",
+          minOrderTotal: "Suma minimă a comenzii este 30 MDL.",
           next: "Continuă",
           submit: "Finalizează",
         };
@@ -307,7 +310,10 @@
         reviewStep: "review",
         missingConsent: "Подтвердите согласие с условиями.",
         missingDelivery: "Выберите способ доставки.",
+        missingPayment: "Выберите способ оплаты.",
+        missingRequiredFields: "Заполните обязательные поля",
         missingStreet: "Укажите улицу и номер дома.",
+        minOrderTotal: "Минимальная сумма заказа 30 MDL.",
         next: "Продолжить",
         submit: "Оформить",
       };
@@ -417,7 +423,7 @@
         const moldovaOption =
           checkoutCountry.querySelector('option[value="MD"]');
         if (moldovaOption instanceof HTMLOptionElement) {
-          moldovaOption.textContent = `+373 ${copy.phoneCountryMoldova}`;
+          moldovaOption.textContent = "🇲🇩 +373";
         }
       }
       renderCheckoutPhoneMask();
@@ -781,6 +787,123 @@
       );
     };
 
+    const getCustomSelectParts = (select) => {
+      if (!(select instanceof HTMLSelectElement) || !select.id) {
+        return { trigger: null, menu: null };
+      }
+      const trigger = checkoutForm?.querySelector(
+        `[data-select-trigger="${select.id}"]`,
+      );
+      const menu = checkoutForm?.querySelector(
+        `[data-select-for="${select.id}"]`,
+      );
+      return {
+        trigger: trigger instanceof HTMLButtonElement ? trigger : null,
+        menu: menu instanceof HTMLElement ? menu : null,
+      };
+    };
+
+    const getCheckoutSelectById = (selectId) => {
+      const element = document.getElementById(normalizeText(selectId));
+      return element instanceof HTMLSelectElement ? element : null;
+    };
+
+    const getSelectOptionLabel = (option) =>
+      normalizeText(option?.label) || normalizeText(option?.textContent);
+
+    const getSelectDisplayText = (select) => {
+      if (!(select instanceof HTMLSelectElement)) {
+        return "";
+      }
+      const selected = select.selectedOptions[0];
+      if (selected?.value) {
+        return getSelectOptionLabel(selected);
+      }
+      const placeholder = Array.from(select.options).find(
+        (option) => !option.value,
+      );
+      return getSelectOptionLabel(placeholder);
+    };
+
+    const positionCustomSelectMenu = (select) => {
+      const { trigger, menu } = getCustomSelectParts(select);
+      if (!trigger || !menu || menu.hidden) {
+        return;
+      }
+      const panel =
+        cartPanel instanceof HTMLElement
+          ? cartPanel
+          : checkoutForm instanceof HTMLElement
+            ? checkoutForm
+            : null;
+      if (!panel) {
+        return;
+      }
+      const panelBox = panel.getBoundingClientRect();
+      const triggerBox = trigger.getBoundingClientRect();
+      const spaceBelow = Math.max(0, panelBox.bottom - triggerBox.bottom - 8);
+      const spaceAbove = Math.max(0, triggerBox.top - panelBox.top - 8);
+      const useAbove = spaceBelow < 120 && spaceAbove > spaceBelow;
+      const available = useAbove ? spaceAbove : spaceBelow;
+      const maxHeight = Math.max(44, Math.min(260, Math.floor(available)));
+      menu.dataset.placement = useAbove ? "above" : "below";
+      menu.style.setProperty(
+        "--products-select-menu-max-height",
+        `${maxHeight}px`,
+      );
+    };
+
+    const renderCustomSelect = (select) => {
+      const { trigger, menu } = getCustomSelectParts(select);
+      if (!trigger || !menu) {
+        return;
+      }
+      const isOpen = state.checkoutOpenSelectId === select.id;
+      const selectedText = getSelectDisplayText(select);
+      const label = trigger.querySelector("[data-select-label]");
+      if (label instanceof HTMLElement) {
+        label.textContent = selectedText;
+      }
+      trigger.disabled =
+        select.disabled ||
+        select.dataset.lookupDisabled === "true" ||
+        state.isSubmittingOrder ||
+        state.orderSubmitted;
+      trigger.dataset.placeholder = select.value ? "false" : "true";
+      trigger.dataset.invalid =
+        select.getAttribute("aria-invalid") === "true" ? "true" : "false";
+      trigger.setAttribute("aria-expanded", String(isOpen));
+      trigger.setAttribute("aria-controls", menu.id);
+      menu.hidden = !isOpen;
+      if (isOpen) {
+        const selectedValue = getCheckoutValue(select);
+        menu.innerHTML = Array.from(select.options)
+          .filter((option) => option.value)
+          .map((option) => {
+            const labelText = getSelectOptionLabel(option);
+            const selected = option.value === selectedValue;
+            return `
+              <button
+                class="products-select-option"
+                type="button"
+                role="option"
+                data-select-option="${escapeHtml(select.id)}"
+                data-select-value="${escapeHtml(option.value)}"
+                aria-selected="${selected ? "true" : "false"}"
+              >${escapeHtml(labelText)}</button>
+            `;
+          })
+          .join("");
+        positionCustomSelectMenu(select);
+      }
+    };
+
+    const renderCustomSelects = () => {
+      for (const select of [checkoutRegion, checkoutSector]) {
+        renderCustomSelect(select);
+      }
+    };
+
     const setSelectOptions = (
       select,
       options,
@@ -826,6 +949,7 @@
       } else {
         delete select.dataset.lookupDisabled;
       }
+      renderCustomSelect(select);
       return nextValue;
     };
 
@@ -1389,6 +1513,7 @@
       ) {
         return;
       }
+      state.checkoutOpenSelectId = "";
       state.checkoutStep = normalized;
       setCheckoutStatus("", "");
       renderCheckout();
@@ -1407,6 +1532,7 @@
       if (state.checkoutStep === copy.addressStep) {
         const validationError = validateOrderPayload(payload, {
           includeConsent: false,
+          includeReview: false,
         });
         if (validationError) {
           setCheckoutStatus(validationError, "error");
@@ -1451,6 +1577,53 @@
       }
       checkoutStatus.textContent = normalizeText(message);
       checkoutStatus.dataset.tone = normalizeText(tone);
+      if (!normalizeText(message)) {
+        clearCheckoutValidation();
+      }
+    };
+
+    const setCheckoutSelectOpen = (selectId) => {
+      const normalized = normalizeText(selectId);
+      const select = getCheckoutSelectById(normalized);
+      if (
+        !select ||
+        select.disabled ||
+        select.dataset.lookupDisabled === "true" ||
+        !select.options.length
+      ) {
+        state.checkoutOpenSelectId = "";
+        renderCustomSelects();
+        return;
+      }
+      state.checkoutOpenSelectId =
+        state.checkoutOpenSelectId === normalized ? "" : normalized;
+      renderCustomSelects();
+      if (state.checkoutOpenSelectId) {
+        window.requestAnimationFrame(() => positionCustomSelectMenu(select));
+      }
+    };
+
+    const closeCheckoutSelect = () => {
+      if (!state.checkoutOpenSelectId) {
+        return;
+      }
+      state.checkoutOpenSelectId = "";
+      renderCustomSelects();
+    };
+
+    const chooseCheckoutSelect = (selectId, value) => {
+      const select = getCheckoutSelectById(selectId);
+      if (
+        !select ||
+        select.disabled ||
+        select.dataset.lookupDisabled === "true"
+      ) {
+        return;
+      }
+      select.value = normalizeText(value);
+      state.checkoutOpenSelectId = "";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      renderCustomSelect(select);
     };
 
     const getCheckoutValue = (element) => {
@@ -1480,10 +1653,9 @@
 
     const getDigitsOnly = (value) => normalizeText(value).replace(/\D/g, "");
 
-    const getCheckoutPhoneNationalDigits = () => {
-      const country = getSelectedPhoneCountry();
+    const getNationalPhoneDigitsFromValue = (value, country) => {
       const dialDigits = getDigitsOnly(country.dialCode);
-      let digits = getDigitsOnly(getCheckoutValue(checkoutPhone));
+      let digits = getDigitsOnly(value);
       if (digits.startsWith(dialDigits)) {
         digits = digits.slice(dialDigits.length);
       }
@@ -1495,6 +1667,12 @@
       }
       return digits.slice(0, country.nationalLength);
     };
+
+    const getCheckoutPhoneNationalDigits = () =>
+      getNationalPhoneDigitsFromValue(
+        getCheckoutValue(checkoutPhone),
+        getSelectedPhoneCountry(),
+      );
 
     const formatPhoneDigits = (digits, country) => {
       const groups = [];
@@ -1521,13 +1699,62 @@
       }
     };
 
-    const formatCheckoutPhoneInput = () => {
+    const getPhoneCaretPosition = (formattedValue, digitCount) => {
+      if (digitCount <= 0) {
+        return 0;
+      }
+      let seenDigits = 0;
+      for (let index = 0; index < formattedValue.length; index += 1) {
+        if (/\d/.test(formattedValue[index])) {
+          seenDigits += 1;
+        }
+        if (seenDigits >= digitCount) {
+          return index + 1;
+        }
+      }
+      return formattedValue.length;
+    };
+
+    const getNationalDigitCaret = (rawValue, caretPosition, country) => {
+      const rawCaret =
+        typeof caretPosition === "number" && caretPosition >= 0
+          ? caretPosition
+          : rawValue.length;
+      const dialDigits = getDigitsOnly(country.dialCode);
+      const allDigits = getDigitsOnly(rawValue);
+      let digitsBeforeCaret = getDigitsOnly(rawValue.slice(0, rawCaret)).length;
+      if (allDigits.startsWith(dialDigits)) {
+        digitsBeforeCaret = Math.max(0, digitsBeforeCaret - dialDigits.length);
+      }
+      if (
+        allDigits.startsWith("0") &&
+        allDigits.length === country.nationalLength + 1 &&
+        digitsBeforeCaret > 0
+      ) {
+        digitsBeforeCaret -= 1;
+      }
+      return Math.max(0, Math.min(country.nationalLength, digitsBeforeCaret));
+    };
+
+    const formatCheckoutPhoneInput = (caretPosition = null) => {
       if (!(checkoutPhone instanceof HTMLInputElement)) {
         return "";
       }
       const country = getSelectedPhoneCountry();
-      const digits = getCheckoutPhoneNationalDigits();
-      checkoutPhone.value = formatPhoneDigits(digits, country);
+      const rawValue = checkoutPhone.value;
+      const digitCaret = getNationalDigitCaret(
+        rawValue,
+        caretPosition,
+        country,
+      );
+      const digits = getNationalPhoneDigitsFromValue(rawValue, country);
+      const formattedValue = formatPhoneDigits(digits, country);
+      checkoutPhone.value = formattedValue;
+      const nextCaret = getPhoneCaretPosition(
+        formattedValue,
+        Math.min(digitCaret, digits.length),
+      );
+      checkoutPhone.setSelectionRange(nextCaret, nextCaret);
       renderCheckoutPhoneMask();
       return digits;
     };
@@ -1560,17 +1787,100 @@
       return "";
     };
 
-    const getSelectedPaymentMethod = () => {
-      const selected =
-        checkoutForm instanceof HTMLElement
-          ? checkoutForm.querySelector(
-              'input[name="products-payment-method"]:checked',
-            )
-          : null;
-      if (selected instanceof HTMLInputElement) {
-        return normalizeText(selected.value) || "cash";
+    const setControlInvalid = (control, invalid) => {
+      if (!(control instanceof HTMLElement)) {
+        return;
       }
-      return "cash";
+      if (invalid) {
+        control.setAttribute("aria-invalid", "true");
+      } else {
+        control.removeAttribute("aria-invalid");
+      }
+      if (control instanceof HTMLSelectElement) {
+        const { trigger } = getCustomSelectParts(control);
+        if (trigger) {
+          trigger.dataset.invalid = invalid ? "true" : "false";
+        }
+      }
+    };
+
+    const clearCheckoutValidation = () => {
+      for (const control of [
+        checkoutName,
+        checkoutPhone,
+        checkoutRegion,
+        checkoutSector,
+        checkoutStreet,
+        checkoutBuilding,
+        checkoutConsent,
+      ]) {
+        setControlInvalid(control, false);
+      }
+      const paymentFieldset = checkoutForm?.querySelector(
+        ".products-payment-methods",
+      );
+      if (paymentFieldset instanceof HTMLElement) {
+        paymentFieldset.removeAttribute("aria-invalid");
+      }
+    };
+
+    const getMissingAddressFields = (payload) => {
+      const copy = getUiCopy();
+      const missing = [];
+      if (!payload.customer_name) {
+        missing.push({
+          control: checkoutName,
+          label: copy.name.replace("*", ""),
+        });
+      }
+      if (!getCheckoutPhoneNationalDigits()) {
+        missing.push({
+          control: checkoutPhone,
+          label: copy.phone.replace("*", ""),
+        });
+      }
+      if (!getCheckoutValue(checkoutRegion)) {
+        missing.push({
+          control: checkoutRegion,
+          label: copy.region.replace("*", ""),
+        });
+      }
+      if (!getCheckoutValue(checkoutSector)) {
+        missing.push({
+          control: checkoutSector,
+          label: copy.sector.replace("*", ""),
+        });
+      }
+      if (payload.delivery_method === "courier") {
+        if (!payload.street) {
+          missing.push({
+            control: checkoutStreet,
+            label: copy.street.replace("*", ""),
+          });
+        }
+        if (!payload.building) {
+          missing.push({
+            control: checkoutBuilding,
+            label: copy.building.replace("*", ""),
+          });
+        }
+      }
+      return missing;
+    };
+
+    const getSelectedPaymentControl = () =>
+      checkoutForm instanceof HTMLElement
+        ? checkoutForm.querySelector(
+            'input[name="products-payment-method"]:checked',
+          )
+        : null;
+
+    const getSelectedPaymentMethod = () => {
+      const selected = getSelectedPaymentControl();
+      if (selected instanceof HTMLInputElement) {
+        return normalizeText(selected.value);
+      }
+      return "";
     };
 
     const getSelectedDeliveryWindow = () => {
@@ -1647,28 +1957,44 @@
     const validateOrderPayload = (payload, options = {}) => {
       const copy = getCartCopy();
       const checkoutCopy = getCheckoutCopy();
+      clearCheckoutValidation();
       if (!payload.items.length) {
         return copy.errorItems;
       }
-      const phoneDigits = getCheckoutPhoneNationalDigits();
-      if (!payload.customer_name || !phoneDigits) {
-        return copy.errorContact;
+      const missingFields = getMissingAddressFields(payload);
+      if (missingFields.length) {
+        for (const field of missingFields) {
+          setControlInvalid(field.control, true);
+        }
+        renderCustomSelects();
+        return `${checkoutCopy.missingRequiredFields}: ${missingFields
+          .map((field) => field.label)
+          .join(", ")}.`;
       }
       const phoneError = validateCheckoutPhone();
       if (phoneError) {
+        setControlInvalid(checkoutPhone, true);
         return phoneError;
       }
-      if (
-        payload.delivery_method === "courier" &&
-        (!payload.street || !payload.building)
-      ) {
-        return checkoutCopy.missingStreet || copy.errorAddress;
+      if (options.includeReview !== false && getCartTotal() < 30) {
+        return checkoutCopy.minOrderTotal;
+      }
+      if (options.includeReview !== false && !getSelectedPaymentMethod()) {
+        const paymentFieldset = checkoutForm?.querySelector(
+          ".products-payment-methods",
+        );
+        if (paymentFieldset instanceof HTMLElement) {
+          paymentFieldset.setAttribute("aria-invalid", "true");
+        }
+        return checkoutCopy.missingPayment;
       }
       if (
+        options.includeReview !== false &&
         options.includeConsent !== false &&
         checkoutConsent instanceof HTMLInputElement &&
         !checkoutConsent.checked
       ) {
+        setControlInvalid(checkoutConsent, true);
         return checkoutCopy.missingConsent;
       }
       return "";
@@ -2122,6 +2448,7 @@
               control.id !== "products-checkout-flow-back");
         }
       }
+      renderCustomSelects();
     };
 
     const renderCheckout = () => {
@@ -2355,6 +2682,9 @@
     ctx.actions.toggleTheme = toggleTheme;
     ctx.actions.changeCartQuantity = changeCartQuantity;
     ctx.actions.removeFromCart = removeFromCart;
+    ctx.actions.toggleCheckoutSelect = setCheckoutSelectOpen;
+    ctx.actions.chooseCheckoutSelect = chooseCheckoutSelect;
+    ctx.actions.closeCheckoutSelect = closeCheckoutSelect;
     ctx.actions.openCart = () => setCartOpen(true);
     ctx.actions.closeCart = () => setCartOpen(false);
     ctx.actions.openCheckout = () => setCheckoutOpen(true);

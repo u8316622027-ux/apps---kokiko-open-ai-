@@ -311,7 +311,7 @@
                           name="phone_country"
                           aria-label="Country code"
                         >
-                          <option value="MD">+373 Moldova</option>
+                          <option value="MD">🇲🇩 +373</option>
                         </select>
                         <input
                           id="products-checkout-flow-phone"
@@ -328,18 +328,66 @@
                       </small>
                     </label>
 
-                    <label class="products-checkout-field">
+                    <label class="products-checkout-field products-custom-select-field">
                       <span>Регион*</span>
-                      <select id="products-checkout-flow-region" name="region_id">
+                      <select
+                        class="products-native-select"
+                        id="products-checkout-flow-region"
+                        name="region_id"
+                        aria-hidden="true"
+                        tabindex="-1"
+                      >
+                        <option value="">Выберите регион</option>
                         <option value="2">г. Кишинёв</option>
                       </select>
+                      <button
+                        class="products-select-trigger"
+                        id="products-checkout-flow-region-trigger"
+                        type="button"
+                        data-select-trigger="products-checkout-flow-region"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                      >
+                        <span data-select-label>Выберите регион</span>
+                      </button>
+                      <div
+                        class="products-select-menu"
+                        id="products-checkout-flow-region-menu"
+                        data-select-for="products-checkout-flow-region"
+                        role="listbox"
+                        hidden
+                      ></div>
                     </label>
 
-                    <label class="products-checkout-field">
+                    <label class="products-checkout-field products-custom-select-field">
                       <span>Сектор*</span>
-                      <select id="products-checkout-flow-sector" name="sector_id">
+                      <select
+                        class="products-native-select"
+                        id="products-checkout-flow-sector"
+                        name="sector_id"
+                        aria-hidden="true"
+                        tabindex="-1"
+                      >
+                        <option value="">Выберите сектор</option>
                         <option value="1550">г. Кишинёв</option>
                       </select>
+                      <button
+                        class="products-select-trigger"
+                        id="products-checkout-flow-sector-trigger"
+                        type="button"
+                        data-select-trigger="products-checkout-flow-sector"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                      >
+                        <span data-select-label>Выберите сектор</span>
+                      </button>
+                      <div
+                        class="products-select-menu"
+                        id="products-checkout-flow-sector-menu"
+                        data-select-for="products-checkout-flow-sector"
+                        role="listbox"
+                        hidden
+                      ></div>
                     </label>
 
                     <label class="products-checkout-field products-courier-only products-checkout-field--wide">
