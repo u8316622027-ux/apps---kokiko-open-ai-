@@ -73,7 +73,6 @@
           errorSubmit: "Comanda nu a putut fi trimisă. Încercați din nou.",
           open: "Coș",
           sending: "Se trimite comanda...",
-          success: "Comanda a fost primită",
           total: "Total",
         };
       }
@@ -88,7 +87,6 @@
         errorSubmit: "Не удалось отправить заказ. Попробуйте еще раз.",
         open: "Корзина",
         sending: "Отправляем заказ...",
-        success: "Заказ принят",
         total: "Итого",
       };
     };
@@ -292,6 +290,7 @@
           addressStep: "address",
           deliveryStep: "delivery",
           reviewStep: "review",
+          successStep: "success",
           missingConsent: "Confirmați acordul cu termenii.",
           missingDelivery: "Alegeți metoda de livrare.",
           missingPayment: "Alegeți metoda de plată.",
@@ -301,12 +300,17 @@
           next: "Continuă",
           submit: "Finalizează",
           syncing: "Se sincronizează coșul...",
+          successTitle: "Comanda a fost plasată!",
+          successText: "Vă mulțumim pentru cumpărătură.",
+          orderNumberLabel: "Numărul comenzii:",
+          continueShopping: "Continuă cumpărăturile",
         };
       }
       return {
         addressStep: "address",
         deliveryStep: "delivery",
         reviewStep: "review",
+        successStep: "success",
         missingConsent: "Подтвердите согласие с условиями.",
         missingDelivery: "Выберите способ доставки.",
         missingPayment: "Выберите способ оплаты.",
@@ -316,6 +320,10 @@
         next: "Продолжить",
         submit: "Оформить",
         syncing: "Синхронизируем корзину...",
+        successTitle: "Заказ оформлен!",
+        successText: "Спасибо за покупку.",
+        orderNumberLabel: "Номер заказа:",
+        continueShopping: "Продолжить покупки",
       };
     };
 
@@ -1534,9 +1542,12 @@
       const copy = getCheckoutCopy();
       const normalized = normalizeText(step);
       if (
-        ![copy.deliveryStep, copy.addressStep, copy.reviewStep].includes(
-          normalized,
-        )
+        ![
+          copy.deliveryStep,
+          copy.addressStep,
+          copy.reviewStep,
+          copy.successStep,
+        ].includes(normalized)
       ) {
         return;
       }
@@ -2072,16 +2083,12 @@
         state.cartToken = "";
         state.orderSubmitted = true;
         state.checkoutOpen = true;
+        state.lastOrderId = orderId;
         writeStoredCart();
         writeStoredCartToken("");
         renderCart();
         renderProducts();
-        setCheckoutStatus(
-          orderId
-            ? `${getCartCopy().success}: ${orderId}`
-            : getCartCopy().success,
-          "success",
-        );
+        setCheckoutStep(getCheckoutCopy().successStep);
         debugLog("submit_order_success", { orderId });
       } catch (error) {
         setCheckoutStatus(getCartCopy().errorSubmit, "error");
@@ -2445,6 +2452,58 @@
         renderCheckoutReview();
       }
 
+      const isSuccessStep =
+        state.checkoutStep === getCheckoutCopy().successStep;
+      const stepsNav = checkoutForm.querySelector(".products-checkout-steps");
+      if (stepsNav instanceof HTMLElement) {
+        stepsNav.hidden = isSuccessStep;
+      }
+      if (isSuccessStep) {
+        const successCopy = getCheckoutCopy();
+        const successTitle = document.getElementById(
+          "products-checkout-flow-success-title",
+        );
+        const successText = document.getElementById(
+          "products-checkout-flow-success-text",
+        );
+        const orderLabel = document.getElementById(
+          "products-checkout-flow-order-label",
+        );
+        const orderNumber = document.getElementById(
+          "products-checkout-flow-order-number",
+        );
+        const continueButton = document.getElementById(
+          "products-checkout-flow-continue",
+        );
+        if (successTitle instanceof HTMLElement) {
+          successTitle.textContent = successCopy.successTitle;
+        }
+        if (successText instanceof HTMLElement) {
+          successText.textContent = successCopy.successText;
+        }
+        if (orderLabel instanceof HTMLElement) {
+          orderLabel.textContent = successCopy.orderNumberLabel;
+        }
+        if (orderNumber instanceof HTMLElement) {
+          orderNumber.textContent = state.lastOrderId;
+        }
+        const orderRow = document.querySelector(
+          ".products-checkout-success-order",
+        );
+        if (orderRow instanceof HTMLElement) {
+          orderRow.hidden = !state.lastOrderId;
+        }
+        if (continueButton instanceof HTMLElement) {
+          continueButton.textContent = successCopy.continueShopping;
+        }
+      }
+
+      const actionsBar = checkoutForm.querySelector(
+        ".products-checkout-actions",
+      );
+      if (actionsBar instanceof HTMLElement) {
+        actionsBar.hidden = isSuccessStep;
+      }
       const nextButton = checkoutForm.querySelector(
         '[data-checkout-action="next"]',
       );
@@ -2489,7 +2548,8 @@
             state.isSubmittingOrder ||
             lookupDisabled ||
             (state.orderSubmitted &&
-              control.id !== "products-checkout-flow-back");
+              control.id !== "products-checkout-flow-back" &&
+              control.id !== "products-checkout-flow-continue");
         }
       }
       renderCustomSelects();

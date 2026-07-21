@@ -1378,9 +1378,10 @@ test("products widget submits checkout form through order tool", async ({
   await page.locator("#products-checkout-flow-consent").check();
   await page.locator("#products-checkout-flow-submit").click();
 
-  await expect(page.locator("#products-checkout-flow-status")).toContainText(
-    "770001",
-  );
+  await expect(page.locator('[data-checkout-step="success"]')).toBeVisible();
+  await expect(
+    page.locator("#products-checkout-flow-order-number"),
+  ).toContainText("770001");
   await expect(page.locator("#products-cart-button")).toContainText("0");
 
   const calls = await page.evaluate(() => window.__KOKIKO_ORDER_CALLS__);
@@ -1397,6 +1398,71 @@ test("products widget submits checkout form through order tool", async ({
   expect(submitCall.args.building).toBe("1");
   expect(submitCall.args.payment_method).toBe("cash");
   expect(submitCall.args.items[0].id).toBe("cream-1");
+});
+
+test("products checkout shows a dedicated success screen after submit and resets on continue", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.openai = {
+      callTool: async (name, args) => {
+        if (name === "submit_order") {
+          return {
+            structuredContent: { status: "submitted", order_id: "990002" },
+          };
+        }
+        const items = Array.isArray(args?.cart?.items) ? args.cart.items : [];
+        const product = args?.product
+          ? {
+              ...args.product,
+              quantity: args.quantity || args.product.quantity || 1,
+            }
+          : null;
+        const nextItems =
+          name === "add_to_cart" && product ? items.concat(product) : items;
+        return {
+          structuredContent: {
+            cart: { token: "success-token", synced: true, items: nextItems },
+          },
+        };
+      },
+    };
+  });
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+  await page.locator('#products-checkout-flow input[value="pickup"]').check();
+  await page.locator('[data-checkout-action="next"]').click();
+  await page.locator("#products-checkout-flow-name").fill("Ana Popescu");
+  await page.locator("#products-checkout-flow-phone").fill("79703000");
+  await page.locator("#products-checkout-flow-region").selectOption("2");
+  await page.locator("#products-checkout-flow-sector").selectOption("1550");
+  await page.locator('[data-checkout-action="next"]').click();
+
+  await expect(page.locator('[data-checkout-step="review"]')).toBeVisible();
+  await page.locator('#products-checkout-flow input[value="cash"]').check();
+  await page.locator("#products-checkout-flow-consent").check();
+  await page.locator("#products-checkout-flow-submit").click();
+
+  await expect(page.locator('[data-checkout-step="success"]')).toBeVisible();
+  await expect(
+    page.locator("#products-checkout-flow-order-number"),
+  ).toContainText("990002");
+  const checkoutFlow = page.locator("#products-checkout-flow");
+  await expect(page.locator("#products-checkout-flow-review")).toBeHidden();
+  await expect(checkoutFlow.locator(".products-payment-methods")).toBeHidden();
+  await expect(checkoutFlow.locator(".products-checkout-actions")).toBeHidden();
+  await expect(checkoutFlow.locator(".products-checkout-steps")).toBeHidden();
+
+  await page.locator("#products-checkout-flow-continue").click();
+
+  await expect(page.locator("#products-checkout-flow")).toBeHidden();
+  await expect(page.locator("#products-cart-items")).toBeVisible();
+  await expect(page.locator("#products-cart-items")).toContainText(
+    /Cart is empty|Корзина пуста|Coșul este gol/,
+  );
 });
 
 test("products checkout re-syncs cart on every entry into the review step", async ({

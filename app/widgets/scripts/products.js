@@ -125,6 +125,10 @@
     }
     if (checkoutAction.dataset.checkoutAction === "back") {
       actions.previousCheckoutStep();
+      return;
+    }
+    if (checkoutAction.dataset.checkoutAction === "continue") {
+      actions.closeCheckout();
     }
   });
 

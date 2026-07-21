@@ -31,6 +31,7 @@
       isSubmittingOrder: false,
       isReconcilingCart: false,
       orderSubmitted: false,
+      lastOrderId: "",
       lastQuery: "",
       apiBaseUrl: "",
       requestedPage: "search",
