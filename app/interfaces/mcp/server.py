@@ -183,6 +183,7 @@ def handle_rpc_request(
         resources = []
         for uri, resource_data in _widget_resource_index().items():
             relative_path = str(resource_data["path"])
+            resource_name = str(resource_data.get("name") or relative_path)
             description = str(resource_data["description"])
             ui_domain = str(resource_data["domain"])
             resource_domains = list(resource_data["resource_domains"])
@@ -190,7 +191,7 @@ def handle_rpc_request(
             resources.append(
                 {
                     "uri": uri,
-                    "name": relative_path,
+                    "name": resource_name,
                     "mimeType": "text/html;profile=mcp-app",
                     "description": description,
                     "_meta": {
@@ -461,6 +462,7 @@ def _widget_resource_index() -> dict[str, dict[str, Any]]:
         relative_path = uri.removeprefix("ui://widget/").strip()
         if not relative_path:
             continue
+        file_path = "products.html" if relative_path == "products-v2.html" else relative_path
         ui_domain = str(tool.ui.get("domain") or "").strip()
         csp = tool.ui.get("csp") if isinstance(tool.ui.get("csp"), dict) else {}
         resource_domains = csp.get("resourceDomains")
@@ -478,7 +480,8 @@ def _widget_resource_index() -> dict[str, dict[str, Any]]:
         mapping.setdefault(
             uri,
             {
-                "path": relative_path,
+                "path": file_path,
+                "name": relative_path,
                 "description": tool.description,
                 "domain": ui_domain,
                 "resource_domains": normalized_resource_domains,

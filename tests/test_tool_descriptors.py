@@ -7,13 +7,15 @@ import pytest
 from app.interfaces.mcp import server as mcp_server
 from app.interfaces.mcp import tool_registry
 
+WIDGET_TEMPLATE_URI = "ui://widget/products-v2.html"
+
 
 def test_tool_descriptor_includes_ui_meta_for_widget() -> None:
     registry = tool_registry.create_tool_registry()
     payload = tool_registry.serialize_tool_definition(registry["search_products"])
 
-    assert payload["outputTemplate"] == "ui://widget/products.html"
-    assert payload["_meta"]["openai/outputTemplate"] == "ui://widget/products.html"
+    assert payload["outputTemplate"] == WIDGET_TEMPLATE_URI
+    assert payload["_meta"]["openai/outputTemplate"] == WIDGET_TEMPLATE_URI
     assert payload["_meta"]["openai/widgetDomain"]
     assert payload["_meta"]["openai/widgetCSP"]["connect_domains"]
     assert payload["_meta"]["openai/widgetCSP"]["resource_domains"]
@@ -60,8 +62,8 @@ def test_cart_tools_are_registered_for_text_control() -> None:
 
     for name in ("add_to_cart", "remove_from_cart", "update_cart_item", "check_cart"):
         payload = tool_registry.serialize_tool_definition(registry[name])
-        assert payload["outputTemplate"] == "ui://widget/products.html"
-        assert payload["_meta"]["openai/outputTemplate"] == "ui://widget/products.html"
+        assert payload["outputTemplate"] == WIDGET_TEMPLATE_URI
+        assert payload["_meta"]["openai/outputTemplate"] == WIDGET_TEMPLATE_URI
         assert payload["annotations"]["destructiveHint"] is False
 
     assert registry["check_cart"].annotations["readOnlyHint"] is True
@@ -73,8 +75,8 @@ def test_theme_and_language_tools_are_registered_for_text_control() -> None:
 
     for name in ("set_widget_theme", "set_widget_language", "open_checkout"):
         payload = tool_registry.serialize_tool_definition(registry[name])
-        assert payload["outputTemplate"] == "ui://widget/products.html"
-        assert payload["_meta"]["openai/outputTemplate"] == "ui://widget/products.html"
+        assert payload["outputTemplate"] == WIDGET_TEMPLATE_URI
+        assert payload["_meta"]["openai/outputTemplate"] == WIDGET_TEMPLATE_URI
         assert payload["annotations"]["destructiveHint"] is False
 
     theme_schema = registry["set_widget_theme"].input_schema

@@ -21,6 +21,8 @@ from app.interfaces.mcp.tools.preference_tools import (
 )
 from app.interfaces.mcp.tools.search_tools import search_products
 
+WIDGET_OUTPUT_TEMPLATE = "ui://widget/products-v2.html"
+
 
 @dataclass(frozen=True, slots=True)
 class ToolDefinition:
@@ -64,7 +66,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
                 "required": ["query"],
             },
             handler=_search_products_handler,
-            output_template="ui://widget/products.html",
+            output_template=WIDGET_OUTPUT_TEMPLATE,
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": True,
@@ -148,7 +150,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             ),
             input_schema=_cart_mutation_schema(require_product=True),
             handler=_add_to_cart_handler,
-            output_template="ui://widget/products.html",
+            output_template=WIDGET_OUTPUT_TEMPLATE,
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": False,
@@ -170,7 +172,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             ),
             input_schema=_cart_mutation_schema(require_product_id=True),
             handler=_remove_from_cart_handler,
-            output_template="ui://widget/products.html",
+            output_template=WIDGET_OUTPUT_TEMPLATE,
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": False,
@@ -192,7 +194,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             ),
             input_schema=_cart_mutation_schema(require_product_id=True, require_quantity=True),
             handler=_update_cart_item_handler,
-            output_template="ui://widget/products.html",
+            output_template=WIDGET_OUTPUT_TEMPLATE,
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": False,
@@ -213,7 +215,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             ),
             input_schema=_cart_mutation_schema(),
             handler=_check_cart_handler,
-            output_template="ui://widget/products.html",
+            output_template=WIDGET_OUTPUT_TEMPLATE,
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": True,
@@ -246,7 +248,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
                 "required": ["theme"],
             },
             handler=_set_widget_theme_handler,
-            output_template="ui://widget/products.html",
+            output_template=WIDGET_OUTPUT_TEMPLATE,
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": False,
@@ -277,7 +279,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
                 "required": ["language"],
             },
             handler=_set_widget_language_handler,
-            output_template="ui://widget/products.html",
+            output_template=WIDGET_OUTPUT_TEMPLATE,
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": False,
@@ -315,7 +317,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
                 },
             },
             handler=_open_checkout_handler,
-            output_template="ui://widget/products.html",
+            output_template=WIDGET_OUTPUT_TEMPLATE,
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": True,
