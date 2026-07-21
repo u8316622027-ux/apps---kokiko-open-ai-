@@ -6,6 +6,7 @@ from app.interfaces.mcp.tools.cart_tools import (
     add_to_cart,
     check_cart,
     remove_from_cart,
+    sync_cart,
     update_cart_item,
 )
 
@@ -195,3 +196,63 @@ def test_check_cart_returns_summary() -> None:
     assert payload["status"] == "ok"
     assert payload["cart"]["count"] == 2
     assert payload["cart"]["total"] == 198.0
+
+
+def test_sync_cart_creates_token_for_empty_cart() -> None:
+    client = FakeCartClient()
+
+    payload = sync_cart({"language": "ru"}, client=client)
+
+    assert payload["cart"]["token"] == "cart-token-123"
+    assert payload["cart"]["synced"] is True
+    assert payload["cart"]["items"] == []
+    assert client.calls == [
+        ("create_cart", "ru"),
+        ("clear_cart", {"token": "cart-token-123", "language": "ru"}),
+    ]
+
+
+def test_sync_cart_reuses_existing_token_and_pushes_items() -> None:
+    client = FakeCartClient()
+
+    payload = sync_cart(
+        {
+            "cart": {
+                "token": "existing-token",
+                "items": [{"id": "26078", "name": "Shampoo", "price": 57.27, "quantity": 2}],
+            },
+            "language": "ru",
+        },
+        client=client,
+    )
+
+    assert payload["cart"]["token"] == "existing-token"
+    assert payload["cart"]["synced"] is True
+    assert client.calls == [
+        (
+            "update_cart",
+            {
+                "token": "existing-token",
+                "items": [{"product_id": 26078, "quantity": 2}],
+                "language": "ru",
+            },
+        )
+    ]
+
+
+def test_sync_cart_does_not_force_token_for_non_numeric_items() -> None:
+    client = FakeCartClient()
+
+    payload = sync_cart(
+        {
+            "cart": {
+                "items": [{"id": "cream-1", "name": "Face cream", "price": 99, "quantity": 1}]
+            },
+            "language": "ru",
+        },
+        client=client,
+    )
+
+    assert payload["cart"]["token"] == ""
+    assert payload["cart"]["synced"] is False
+    assert client.calls == []

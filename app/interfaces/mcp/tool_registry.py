@@ -11,6 +11,7 @@ from app.interfaces.mcp.tools.cart_tools import (
     add_to_cart,
     check_cart,
     remove_from_cart,
+    sync_cart,
     update_cart_item,
 )
 from app.interfaces.mcp.tools.order_tools import submit_order
@@ -227,6 +228,29 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
                 "invoked": "Cart checked.",
             },
         ),
+        "sync_cart": ToolDefinition(
+            name="sync_cart",
+            title="Sync cart",
+            description=(
+                "Internal cart-session tool used by the widget to create/confirm the "
+                "backend Kokiko cart token and push the current cart items to it. "
+                "Not for direct assistant use - use add_to_cart/remove_from_cart/check_cart "
+                "for user-facing cart actions."
+            ),
+            input_schema=_cart_mutation_schema(),
+            handler=_sync_cart_handler,
+            output_template=WIDGET_OUTPUT_TEMPLATE,
+            ui=widget_ui_config,
+            annotations={
+                "readOnlyHint": False,
+                "openWorldHint": False,
+                "destructiveHint": False,
+            },
+            tool_invocation={
+                "invoking": "Syncing cart...",
+                "invoked": "Cart synced.",
+            },
+        ),
         "set_widget_theme": ToolDefinition(
             name="set_widget_theme",
             title="Set widget theme",
@@ -397,7 +421,13 @@ def decorate_tool_result(
 def _resolve_widget_page(tool_name: str) -> str:
     if tool_name == "search_products":
         return "search"
-    if tool_name in {"add_to_cart", "remove_from_cart", "update_cart_item", "check_cart"}:
+    if tool_name in {
+        "add_to_cart",
+        "remove_from_cart",
+        "update_cart_item",
+        "check_cart",
+        "sync_cart",
+    }:
         return "cart"
     if tool_name == "open_checkout":
         return "checkout"
@@ -489,6 +519,10 @@ def _update_cart_item_handler(arguments: dict[str, Any]) -> dict[str, Any]:
 
 def _check_cart_handler(arguments: dict[str, Any]) -> dict[str, Any]:
     return check_cart(arguments)
+
+
+def _sync_cart_handler(arguments: dict[str, Any]) -> dict[str, Any]:
+    return sync_cart(arguments)
 
 
 def _set_widget_theme_handler(arguments: dict[str, Any]) -> dict[str, Any]:

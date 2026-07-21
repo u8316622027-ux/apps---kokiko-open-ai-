@@ -6,6 +6,7 @@ import pytest
 
 from app.interfaces.mcp import server as mcp_server
 from app.interfaces.mcp import tool_registry
+from app.interfaces.mcp.tools.apteka_urls import get_apteka_base_url
 
 WIDGET_TEMPLATE_URI = "ui://widget/products.html"
 
@@ -70,6 +71,16 @@ def test_cart_tools_are_registered_for_text_control() -> None:
     assert registry["add_to_cart"].annotations["readOnlyHint"] is False
 
 
+def test_sync_cart_tool_is_registered_for_widget_bootstrap() -> None:
+    registry = tool_registry.create_tool_registry()
+    payload = tool_registry.serialize_tool_definition(registry["sync_cart"])
+
+    assert payload["outputTemplate"] == WIDGET_TEMPLATE_URI
+    assert payload["_meta"]["openai/outputTemplate"] == WIDGET_TEMPLATE_URI
+    assert registry["sync_cart"].annotations["readOnlyHint"] is False
+    assert registry["sync_cart"].annotations["destructiveHint"] is False
+
+
 def test_theme_and_language_tools_are_registered_for_text_control() -> None:
     registry = tool_registry.create_tool_registry()
 
@@ -96,7 +107,7 @@ def test_widget_ui_config_includes_resource_and_connect_domains(
     csp = ui_config["csp"]
 
     assert "https://widgets.example" in csp["resourceDomains"]
-    assert "https://api.apteka.md" in csp["connectDomains"]
+    assert get_apteka_base_url() in csp["connectDomains"]
     assert "https://cdn.jsdelivr.net" not in csp["resourceDomains"]
 
 

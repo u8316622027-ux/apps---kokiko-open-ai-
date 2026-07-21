@@ -136,6 +136,33 @@ def check_cart(arguments: dict[str, Any]) -> dict[str, Any]:
     return _build_cart_response(_normalize_cart(arguments.get("cart")), status="ok", action="check")
 
 
+def sync_cart(
+    arguments: dict[str, Any],
+    *,
+    client: KokikoCartClientProtocol | None = None,
+) -> dict[str, Any]:
+    """Ensure a backend cart token exists and push the current cart to it."""
+
+    cart_items = _normalize_cart(arguments.get("cart"))
+    cart_token = _extract_cart_token(arguments.get("cart")) or _normalize_text(
+        arguments.get("cart_token")
+    )
+    sync = _sync_live_cart(
+        cart_items,
+        cart_token=cart_token,
+        language=_normalize_language(arguments.get("language")),
+        client=client,
+        always_create_token=True,
+    )
+    return _build_cart_response(
+        cart_items,
+        status="ok",
+        action="sync",
+        cart_token=sync["token"],
+        synced=sync["synced"],
+    )
+
+
 def _build_cart_response(
     items: list[dict[str, Any]],
     *,
@@ -182,11 +209,12 @@ def _sync_live_cart(
     cart_token: str,
     language: str,
     client: KokikoCartClientProtocol | None,
+    always_create_token: bool = False,
 ) -> dict[str, Any]:
     live_items = _to_live_cart_items(items)
     if not live_items and items:
         return {"token": cart_token, "synced": False}
-    if not live_items and not cart_token:
+    if not live_items and not cart_token and not always_create_token:
         return {"token": "", "synced": False}
 
     effective_client = client or KokikoOrderClient()
