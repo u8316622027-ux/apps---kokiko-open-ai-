@@ -121,7 +121,7 @@ def test_tools_list_cache_refreshes_after_reset(monkeypatch: pytest.MonkeyPatch)
     assert second["tools"][0]["ui"]["domain"] == "https://example-b.test"
 
 
-def test_widget_resource_uses_cache_busted_products_template() -> None:
+def test_widget_resource_uses_products_template() -> None:
     mcp_server._reset_server_caches_for_tests()
 
     list_response = mcp_server.handle_rpc_request(
@@ -130,14 +130,14 @@ def test_widget_resource_uses_cache_busted_products_template() -> None:
     resources = list_response["result"]["resources"]
     uris = [resource["uri"] for resource in resources]
 
-    assert "ui://widget/products-v2.html" in uris
+    assert "ui://widget/products.html" in uris
 
     read_response = mcp_server.handle_rpc_request(
         {
             "jsonrpc": "2.0",
             "id": "2",
             "method": "resources/read",
-            "params": {"uri": "ui://widget/products-v2.html"},
+            "params": {"uri": "ui://widget/products.html"},
         }
     )
     text = read_response["result"]["contents"][0]["text"]
@@ -268,11 +268,11 @@ def test_get_health_still_returns_ok() -> None:
     assert payload == {"status": "ok"}
 
 
-def test_get_cache_busted_widget_template_returns_html() -> None:
+def test_get_widget_template_returns_html() -> None:
     server, thread, host, port = _start_mcp_server()
     try:
         status, headers, body = _http_request(
-            host=host, port=port, method="GET", path="/products-v2.html"
+            host=host, port=port, method="GET", path="/products.html"
         )
     finally:
         _stop_mcp_server(server, thread)

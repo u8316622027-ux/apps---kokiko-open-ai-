@@ -21,7 +21,7 @@ from app.interfaces.mcp.tools.preference_tools import (
 )
 from app.interfaces.mcp.tools.search_tools import search_products
 
-WIDGET_OUTPUT_TEMPLATE = "ui://widget/products-v2.html"
+WIDGET_OUTPUT_TEMPLATE = "ui://widget/products.html"
 
 
 @dataclass(frozen=True, slots=True)

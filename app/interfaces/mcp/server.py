@@ -463,7 +463,6 @@ def _widget_resource_index() -> dict[str, dict[str, Any]]:
         relative_path = uri.removeprefix("ui://widget/").strip()
         if not relative_path:
             continue
-        file_path = "products.html" if relative_path == "products-v2.html" else relative_path
         ui_domain = str(tool.ui.get("domain") or "").strip()
         csp = tool.ui.get("csp") if isinstance(tool.ui.get("csp"), dict) else {}
         resource_domains = csp.get("resourceDomains")
@@ -481,7 +480,7 @@ def _widget_resource_index() -> dict[str, dict[str, Any]]:
         mapping.setdefault(
             uri,
             {
-                "path": file_path,
+                "path": relative_path,
                 "name": relative_path,
                 "description": tool.description,
                 "domain": ui_domain,

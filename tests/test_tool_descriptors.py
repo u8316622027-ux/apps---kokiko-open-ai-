@@ -7,7 +7,7 @@ import pytest
 from app.interfaces.mcp import server as mcp_server
 from app.interfaces.mcp import tool_registry
 
-WIDGET_TEMPLATE_URI = "ui://widget/products-v2.html"
+WIDGET_TEMPLATE_URI = "ui://widget/products.html"
 
 
 def test_tool_descriptor_includes_ui_meta_for_widget() -> None:
