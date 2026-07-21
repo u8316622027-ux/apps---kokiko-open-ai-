@@ -438,12 +438,8 @@ def _normalize_delivery_method(value: Any) -> str:
 
 def _normalize_payment_type(value: Any) -> str:
     normalized = _normalize_text(value).lower()
-    if normalized in {"card", "cash", "mia", "maib", "cashless_individual", "cashless_legal"}:
+    if normalized in {"card", "cash"}:
         return normalized
-    if normalized in {"card-online", "card_online", "online-card", "online_card"}:
-        return "maib"
-    if normalized in {"iban", "transfer", "bank-transfer", "bank_transfer"}:
-        return "cashless_individual"
     return "cash"
 
 

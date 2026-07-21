@@ -303,17 +303,29 @@
                       />
                     </label>
 
-                    <label class="products-checkout-field">
+                    <label class="products-checkout-field products-checkout-phone-field">
                       <span>Номер телефона*</span>
-                      <input
-                        id="products-checkout-flow-phone"
-                        name="customer_phone"
-                        type="tel"
-                        inputmode="tel"
-                        autocomplete="tel"
-                        placeholder="37379703000"
-                        required
-                      />
+                      <div class="products-phone-control">
+                        <select
+                          id="products-checkout-flow-country"
+                          name="phone_country"
+                          aria-label="Country code"
+                        >
+                          <option value="MD">+373 Moldova</option>
+                        </select>
+                        <input
+                          id="products-checkout-flow-phone"
+                          name="customer_phone"
+                          type="tel"
+                          inputmode="numeric"
+                          autocomplete="tel-national"
+                          placeholder="XX XXX XXX"
+                          required
+                        />
+                      </div>
+                      <small class="products-phone-mask" id="products-checkout-flow-phone-mask">
+                        +373 XX XXX XXX
+                      </small>
                     </label>
 
                     <label class="products-checkout-field">
@@ -422,18 +434,6 @@
                     <label>
                       <input type="radio" name="products-payment-method" value="card" />
                       <span>Картой при получении</span>
-                    </label>
-                    <label>
-                      <input type="radio" name="products-payment-method" value="maib" />
-                      <span>Картой онлайн</span>
-                    </label>
-                    <label>
-                      <input type="radio" name="products-payment-method" value="mia" />
-                      <span>Онлайн по QR коду</span>
-                    </label>
-                    <label>
-                      <input type="radio" name="products-payment-method" value="cashless_individual" />
-                      <span>Перечислением</span>
                     </label>
                   </fieldset>
 

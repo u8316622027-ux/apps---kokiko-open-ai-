@@ -18,7 +18,9 @@
       cartCheckout,
       checkoutForm,
       checkoutName,
+      checkoutCountry,
       checkoutPhone,
+      checkoutPhoneMask,
       checkoutCity,
       checkoutAddress,
       checkoutComment,
@@ -131,6 +133,13 @@
           paymentMethods: "Alegeți metoda de plată:",
           pharmacy: "Farmacie",
           phone: "Număr de telefon*",
+          phoneCountry: "Cod țară",
+          phoneCountryMoldova: "Moldova",
+          phoneLengthError:
+            "Introduceți numărul Moldovei: 8 cifre după +373, de exemplu 79 703 000.",
+          phoneMaskHint: "+373 XX XXX XXX",
+          phonePrefixError:
+            "Introduceți un număr mobil valid din Moldova, de exemplu 79 703 000.",
           pickup: "Ridicare personală",
           pickupDescription: "Livrare gratuită la farmacii în toată țara.",
           pickupFromStore: "Ridicare din farmacie",
@@ -197,6 +206,13 @@
         paymentMethods: "Выберите способ оплаты:",
         pharmacy: "Аптека",
         phone: "Номер телефона*",
+        phoneCountry: "Код страны",
+        phoneCountryMoldova: "Молдова",
+        phoneLengthError:
+          "Введите молдавский номер: 8 цифр после +373, например 79 703 000.",
+        phoneMaskHint: "+373 XX XXX XXX",
+        phonePrefixError:
+          "Введите корректный мобильный номер Молдовы, например 79 703 000.",
         pickup: "Самовывоз",
         pickupDescription: "Бесплатная доставка в аптеки по всей стране.",
         pickupFromStore: "Самовывоз из аптеки",
@@ -396,6 +412,15 @@
       }
       setLabelText(checkoutName, copy.name);
       setLabelText(checkoutPhone, copy.phone);
+      if (checkoutCountry instanceof HTMLSelectElement) {
+        checkoutCountry.setAttribute("aria-label", copy.phoneCountry);
+        const moldovaOption =
+          checkoutCountry.querySelector('option[value="MD"]');
+        if (moldovaOption instanceof HTMLOptionElement) {
+          moldovaOption.textContent = `+373 ${copy.phoneCountryMoldova}`;
+        }
+      }
+      renderCheckoutPhoneMask();
       setLabelText(checkoutRegion, copy.region);
       setLabelText(checkoutSector, copy.sector);
       setLabelText(checkoutStreet, copy.street);
@@ -416,9 +441,6 @@
       const paymentLabels = {
         cash: copy.paymentMethodCash,
         card: copy.paymentMethodCard,
-        maib: copy.paymentMethodMaib,
-        mia: copy.paymentMethodMia,
-        cashless_individual: copy.paymentMethodCashless,
       };
       for (const [value, text] of Object.entries(paymentLabels)) {
         const label = checkoutForm?.querySelector(
@@ -1442,6 +1464,102 @@
       return "";
     };
 
+    const PHONE_COUNTRIES = {
+      MD: {
+        code: "MD",
+        dialCode: "+373",
+        groups: [2, 3, 3],
+        nationalLength: 8,
+        mobilePattern: /^(6\d|71|7[6-9])\d{6}$/,
+        mask: "XX XXX XXX",
+      },
+    };
+
+    const getSelectedPhoneCountry = () =>
+      PHONE_COUNTRIES[getCheckoutValue(checkoutCountry)] || PHONE_COUNTRIES.MD;
+
+    const getDigitsOnly = (value) => normalizeText(value).replace(/\D/g, "");
+
+    const getCheckoutPhoneNationalDigits = () => {
+      const country = getSelectedPhoneCountry();
+      const dialDigits = getDigitsOnly(country.dialCode);
+      let digits = getDigitsOnly(getCheckoutValue(checkoutPhone));
+      if (digits.startsWith(dialDigits)) {
+        digits = digits.slice(dialDigits.length);
+      }
+      if (
+        digits.startsWith("0") &&
+        digits.length === country.nationalLength + 1
+      ) {
+        digits = digits.slice(1);
+      }
+      return digits.slice(0, country.nationalLength);
+    };
+
+    const formatPhoneDigits = (digits, country) => {
+      const groups = [];
+      let offset = 0;
+      for (const size of country.groups) {
+        const part = digits.slice(offset, offset + size);
+        if (part) {
+          groups.push(part);
+        }
+        offset += size;
+      }
+      return groups.join(" ");
+    };
+
+    const renderCheckoutPhoneMask = () => {
+      const copy = getUiCopy();
+      const country = getSelectedPhoneCountry();
+      if (checkoutPhone instanceof HTMLInputElement) {
+        checkoutPhone.placeholder = country.mask;
+        checkoutPhone.removeAttribute("maxlength");
+      }
+      if (checkoutPhoneMask instanceof HTMLElement) {
+        checkoutPhoneMask.textContent = copy.phoneMaskHint;
+      }
+    };
+
+    const formatCheckoutPhoneInput = () => {
+      if (!(checkoutPhone instanceof HTMLInputElement)) {
+        return "";
+      }
+      const country = getSelectedPhoneCountry();
+      const digits = getCheckoutPhoneNationalDigits();
+      checkoutPhone.value = formatPhoneDigits(digits, country);
+      renderCheckoutPhoneMask();
+      return digits;
+    };
+
+    const getFullCheckoutPhone = () => {
+      const country = getSelectedPhoneCountry();
+      const digits = getCheckoutPhoneNationalDigits();
+      if (digits.length !== country.nationalLength) {
+        return "";
+      }
+      return `${country.dialCode}${digits}`;
+    };
+
+    const validateCheckoutPhone = () => {
+      const country = getSelectedPhoneCountry();
+      const copy = getUiCopy();
+      const digits = getCheckoutPhoneNationalDigits();
+      if (!digits) {
+        return "";
+      }
+      if (digits.length !== country.nationalLength) {
+        return copy.phoneLengthError;
+      }
+      if (
+        country.mobilePattern instanceof RegExp &&
+        !country.mobilePattern.test(digits)
+      ) {
+        return copy.phonePrefixError;
+      }
+      return "";
+    };
+
     const getSelectedPaymentMethod = () => {
       const selected =
         checkoutForm instanceof HTMLElement
@@ -1494,7 +1612,9 @@
     const buildOrderPayload = () => ({
       cart_token: state.cartToken,
       customer_name: getCheckoutValue(checkoutName),
-      customer_phone: getCheckoutValue(checkoutPhone),
+      customer_phone: getFullCheckoutPhone(),
+      customer_phone_country: getSelectedPhoneCountry().code,
+      customer_phone_national: getCheckoutPhoneNationalDigits(),
       delivery_method: getDeliveryMethod(),
       city: getCheckoutValue(checkoutCity) || "Chisinau",
       address: composeAddress(),
@@ -1530,8 +1650,13 @@
       if (!payload.items.length) {
         return copy.errorItems;
       }
-      if (!payload.customer_name || !payload.customer_phone) {
+      const phoneDigits = getCheckoutPhoneNationalDigits();
+      if (!payload.customer_name || !phoneDigits) {
         return copy.errorContact;
+      }
+      const phoneError = validateCheckoutPhone();
+      if (phoneError) {
+        return phoneError;
       }
       if (
         payload.delivery_method === "courier" &&
@@ -2219,9 +2344,11 @@
     ctx.ui.renderProducts = renderProducts;
     ctx.ui.renderCart = renderCart;
     ctx.ui.renderCheckout = renderCheckout;
+    ctx.ui.renderCheckoutPhoneMask = renderCheckoutPhoneMask;
     ctx.ui.toggleCart = setCartOpen;
     ctx.ui.toggleCheckout = setCheckoutOpen;
     ctx.actions.addToCart = addToCart;
+    ctx.actions.formatCheckoutPhone = formatCheckoutPhoneInput;
     ctx.actions.setLanguage = setLanguage;
     ctx.actions.toggleLanguage = toggleLanguage;
     ctx.actions.setTheme = setTheme;

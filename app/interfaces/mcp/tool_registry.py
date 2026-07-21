@@ -109,7 +109,8 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
                     "shop_id": {"type": "integer"},
                     "payment_method": {
                         "type": "string",
-                        "description": "cash, card, card-online, mia, iban",
+                        "enum": ["cash", "card"],
+                        "description": "cash or card on delivery",
                     },
                     "delivery_window": {"type": "object"},
                     "use_bonuses": {"type": "boolean"},

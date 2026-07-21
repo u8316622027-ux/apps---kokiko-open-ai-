@@ -165,6 +165,40 @@ def test_submit_order_uses_kokiko_pickup_shop_by_default() -> None:
     }
 
 
+@pytest.mark.parametrize(
+    ("requested_payment", "expected_payment"),
+    [
+        ("cash", "cash"),
+        ("card", "card"),
+        ("maib", "cash"),
+        ("mia", "cash"),
+        ("cashless_individual", "cash"),
+    ],
+)
+def test_submit_order_limits_payment_methods_to_cash_and_card(
+    requested_payment: str,
+    expected_payment: str,
+) -> None:
+    client = FakeKokikoOrderClient()
+
+    submit_order(
+        {
+            "customer_name": "Ana Popescu",
+            "customer_phone": "+37379802000",
+            "delivery_method": "pickup",
+            "payment_method": requested_payment,
+            "items": [{"id": 123, "name": "Face cream", "price": 99, "quantity": 1}],
+        },
+        client=client,
+    )
+
+    sent_order = client.calls[-1][1]
+    assert isinstance(sent_order, dict)
+    order_payload = sent_order["payload"]
+    assert isinstance(order_payload, dict)
+    assert order_payload["payment"]["type"] == expected_payment
+
+
 def test_submit_order_reuses_existing_kokiko_cart_token() -> None:
     client = FakeKokikoOrderClient()
 

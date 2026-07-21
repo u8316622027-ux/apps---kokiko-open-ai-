@@ -1100,7 +1100,7 @@ test("products widget submits checkout form through order tool", async ({
 
   await expect(page.locator('[data-checkout-step="address"]')).toBeVisible();
   await page.locator("#products-checkout-flow-name").fill("Ana Popescu");
-  await page.locator("#products-checkout-flow-phone").fill("079 802 000");
+  await page.locator("#products-checkout-flow-phone").fill("79703000");
   await page.locator("#products-checkout-flow-street").fill("str. Alecu Russo");
   await page.locator("#products-checkout-flow-building").fill("1");
   await page
@@ -1126,11 +1126,72 @@ test("products widget submits checkout form through order tool", async ({
     return;
   }
   expect(submitCall.args.customer_name).toBe("Ana Popescu");
+  expect(submitCall.args.customer_phone).toBe("+37379703000");
   expect(submitCall.args.delivery_method).toBe("courier");
   expect(submitCall.args.street).toBe("str. Alecu Russo");
   expect(submitCall.args.building).toBe("1");
   expect(submitCall.args.payment_method).toBe("cash");
   expect(submitCall.args.items[0].id).toBe("cream-1");
+});
+
+test("products checkout validates Moldova phone mask and digits only", async ({
+  page,
+}) => {
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+  await page.locator('#products-checkout-flow input[value="pickup"]').check();
+  await page.locator('[data-checkout-action="next"]').click();
+
+  await expect(page.locator("#products-checkout-flow-country")).toHaveValue(
+    "MD",
+  );
+  await expect(
+    page.locator("#products-checkout-flow-phone-mask"),
+  ).toContainText("+373 XX XXX XXX");
+
+  const phone = page.locator("#products-checkout-flow-phone");
+  await phone.fill("79abc703000!!");
+  await expect(phone).toHaveValue("79 703 000");
+
+  await phone.fill("12");
+  await page.locator("#products-checkout-flow-name").fill("Ana Popescu");
+  await page.locator('[data-checkout-action="next"]').click();
+  await expect(page.locator("#products-checkout-flow-status")).toContainText(
+    /8 цифр|8 digits/,
+  );
+
+  await phone.fill("79703000");
+  await expect(phone).toHaveValue("79 703 000");
+  await page.locator('[data-checkout-action="next"]').click();
+  await expect(page.locator('[data-checkout-step="review"]')).toBeVisible();
+});
+
+test("products checkout only offers cash and card on delivery payment", async ({
+  page,
+}) => {
+  await openWidgetWithProduct(page);
+
+  await page.locator('[data-action="add-to-cart"]').click();
+  await page.locator("#products-cart-button").click();
+  await page.locator("#products-cart-checkout").click();
+  await page.locator('#products-checkout-flow input[value="pickup"]').check();
+  await page.locator('[data-checkout-action="next"]').click();
+  await page.locator("#products-checkout-flow-name").fill("Ana Popescu");
+  await page.locator("#products-checkout-flow-phone").fill("79703000");
+  await page.locator('[data-checkout-action="next"]').click();
+
+  const paymentValues = await page
+    .locator('input[name="products-payment-method"]')
+    .evaluateAll((inputs) => inputs.map((input) => input.value));
+  expect(paymentValues).toEqual(["cash", "card"]);
+  await expect(page.locator('input[value="maib"]')).toHaveCount(0);
+  await expect(page.locator('input[value="mia"]')).toHaveCount(0);
+  await expect(page.locator('input[value="cashless_individual"]')).toHaveCount(
+    0,
+  );
 });
 
 test("products checkout form can scroll on short screens", async ({ page }) => {

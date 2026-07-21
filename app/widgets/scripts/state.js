@@ -54,8 +54,14 @@
     const cartCheckout = document.getElementById("products-cart-checkout");
     const checkoutForm = document.getElementById("products-checkout-flow");
     const checkoutName = document.getElementById("products-checkout-flow-name");
+    const checkoutCountry = document.getElementById(
+      "products-checkout-flow-country",
+    );
     const checkoutPhone = document.getElementById(
       "products-checkout-flow-phone",
+    );
+    const checkoutPhoneMask = document.getElementById(
+      "products-checkout-flow-phone-mask",
     );
     const checkoutCity = document.getElementById("products-checkout-flow-city");
     const checkoutAddress = document.getElementById(
@@ -650,7 +656,9 @@
         cartCheckout,
         checkoutForm,
         checkoutName,
+        checkoutCountry,
         checkoutPhone,
+        checkoutPhoneMask,
         checkoutCity,
         checkoutAddress,
         checkoutComment,
@@ -676,6 +684,7 @@
         renderProducts: () => {},
         renderCart: () => {},
         renderCheckout: () => {},
+        renderCheckoutPhoneMask: () => {},
         updateCarouselControls: () => {},
         toggleCart: (_nextState) => {},
         toggleCheckout: (_nextState) => {},
@@ -689,6 +698,7 @@
         toggleTheme: () => {},
         openSupportPopup: () => {},
         addToCart: (_productId) => {},
+        formatCheckoutPhone: () => {},
         changeCartQuantity: (_productId, _delta) => {},
         removeFromCart: (_productId) => {},
         openCart: () => {},

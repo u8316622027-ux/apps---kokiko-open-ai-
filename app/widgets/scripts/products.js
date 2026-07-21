@@ -33,6 +33,8 @@
     cartCheckout,
     checkoutForm,
     checkoutBack,
+    checkoutCountry,
+    checkoutPhone,
     checkoutPharmacy,
   } = dom;
 
@@ -159,6 +161,11 @@
 
   checkoutForm?.addEventListener("change", (event) => {
     const target = event.target instanceof HTMLElement ? event.target : null;
+    if (target === checkoutCountry) {
+      actions.formatCheckoutPhone();
+      ui.renderCheckoutPhoneMask();
+      return;
+    }
     if (
       target instanceof HTMLInputElement &&
       target.name === "products-delivery-window"
@@ -190,6 +197,10 @@
     if (state.checkoutStep === "address") {
       void actions.refreshCheckoutDeliveryData();
     }
+  });
+
+  checkoutPhone?.addEventListener("input", () => {
+    actions.formatCheckoutPhone();
   });
 
   checkoutForm?.addEventListener("submit", (event) => {
