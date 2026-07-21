@@ -143,7 +143,7 @@ def test_widget_resource_uses_products_template() -> None:
     text = read_response["result"]["contents"][0]["text"]
 
     assert "products-checkout-flow-region-trigger" in text
-    assert "🇲🇩 +373" in text
+    assert "MD +373" in text
 
 
 def test_build_access_log_message_sanitizes_user_agent() -> None:
