@@ -1138,13 +1138,20 @@ test("products widget submits checkout form through order tool", async ({
 
   await page.locator('[data-action="add-to-cart"]').click();
   await page.locator("#products-cart-button").click();
+  await expect(page.locator("#products-cart-title")).toHaveText("Корзина");
   await page.locator("#products-cart-checkout").click();
 
   await expect(page.locator("#products-cart-panel")).toHaveClass(/is-checkout/);
   await expect(page.locator("#products-cart-items")).toBeHidden();
   await expect(page.locator("#products-checkout-flow")).toBeVisible();
-  await expect(page.locator("#products-cart-title")).toBeHidden();
+  await expect(page.locator("#products-cart-title")).toBeVisible();
+  await expect(page.locator("#products-cart-title")).toHaveText(
+    "Оформление заказа",
+  );
   await expect(page.locator("#products-cart-close")).toBeVisible();
+  await expect(
+    page.locator("#products-checkout-flow .products-checkout-heading"),
+  ).toBeHidden();
   await expect(page.locator('[data-checkout-step="delivery"]')).toBeVisible();
   await page.locator('#products-checkout-flow input[value="courier"]').check();
   await page.locator('[data-checkout-action="next"]').click();
@@ -1201,6 +1208,9 @@ test("products checkout validates Moldova phone mask and digits only", async ({
   await expect(page.locator("#products-checkout-flow-country")).toHaveValue(
     "MD",
   );
+  await expect(
+    page.locator('#products-checkout-flow-country option[value="MD"]'),
+  ).toHaveText("MD +373");
   await expect(page.locator("#products-checkout-flow-phone-mask")).toHaveCount(
     0,
   );

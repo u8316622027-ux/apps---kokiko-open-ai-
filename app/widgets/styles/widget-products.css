@@ -609,15 +609,6 @@ body {
   max-height: min(760px, calc(100vh - 24px));
 }
 
-.products-cart-panel.is-checkout .products-cart-header {
-  justify-content: flex-end;
-  padding-bottom: 8px;
-}
-
-.products-cart-panel.is-checkout .products-cart-header-text {
-  display: none;
-}
-
 .products-cart-header {
   display: flex;
   align-items: flex-start;
@@ -812,8 +803,7 @@ body {
 }
 
 .products-checkout-heading {
-  display: grid;
-  gap: 2px;
+  display: none;
 }
 
 .products-checkout-title {

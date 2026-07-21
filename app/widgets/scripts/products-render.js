@@ -356,7 +356,10 @@
       rightArrow?.setAttribute("aria-label", copy.next);
       const cartTitle = document.getElementById("products-cart-title");
       if (cartTitle instanceof HTMLElement) {
-        cartTitle.textContent = cartCopy.cart;
+        const showingCheckout = state.checkoutOpen || state.orderSubmitted;
+        cartTitle.textContent = showingCheckout
+          ? copy.checkoutTitle
+          : cartCopy.cart;
       }
       document
         .getElementById("products-cart-close")
@@ -420,7 +423,7 @@
         const moldovaOption =
           checkoutCountry.querySelector('option[value="MD"]');
         if (moldovaOption instanceof HTMLOptionElement) {
-          moldovaOption.textContent = "🇲🇩 +373";
+          moldovaOption.textContent = "MD +373";
         }
       }
       renderCheckoutPhoneMask();
