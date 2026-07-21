@@ -115,7 +115,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
                         "enum": ["cash", "card"],
                         "description": "cash or card on delivery",
                     },
-                    "delivery_window": {"type": "object"},
+                    "delivery_window": {"type": ["object", "null"]},
                     "use_bonuses": {"type": "boolean"},
                     "promo_code": {"type": "string"},
                     "comment": {"type": "string"},

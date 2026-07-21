@@ -497,6 +497,12 @@ def _validate_input_schema(arguments: dict[str, Any], schema: dict[str, Any]) ->
 
 def _validate_value(value: Any, schema: dict[str, Any], *, path: str) -> str | None:
     expected_type = schema.get("type")
+    if isinstance(expected_type, list):
+        if value is None and "null" in expected_type:
+            return None
+        non_null_types = [item for item in expected_type if item != "null"]
+        expected_type = non_null_types[0] if len(non_null_types) == 1 else None
+
     if expected_type == "object":
         if not isinstance(value, dict):
             return f"{path} must be an object"

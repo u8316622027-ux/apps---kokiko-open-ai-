@@ -72,6 +72,48 @@ def test_build_tool_success_text_round_trips_payload() -> None:
     assert json.loads(encoded) == payload
 
 
+def test_validate_value_allows_null_for_nullable_object_type() -> None:
+    schema = {
+        "type": "object",
+        "properties": {"delivery_window": {"type": ["object", "null"]}},
+    }
+
+    error = mcp_server._validate_value({"delivery_window": None}, schema, path="arguments")
+
+    assert error is None
+
+
+def test_validate_value_still_validates_nullable_object_shape() -> None:
+    schema = {
+        "type": "object",
+        "properties": {"delivery_window": {"type": ["object", "null"]}},
+    }
+
+    error = mcp_server._validate_value(
+        {"delivery_window": "not-an-object"}, schema, path="arguments"
+    )
+
+    assert error == "arguments.delivery_window must be an object"
+
+
+def test_submit_order_schema_allows_null_delivery_window() -> None:
+    registry = tool_registry.create_tool_registry()
+    delivery_window_schema = registry["submit_order"].input_schema["properties"]["delivery_window"]
+
+    error = mcp_server._validate_input_schema(
+        {
+            "customer_name": "Ana Popescu",
+            "customer_phone": "79703000",
+            "items": [{"id": "1", "name": "Cream", "price": 99, "quantity": 1}],
+            "delivery_window": None,
+        },
+        registry["submit_order"].input_schema,
+    )
+
+    assert error is None
+    assert "null" in delivery_window_schema["type"]
+
+
 def test_handle_rpc_request_tool_error_omits_http_request_id() -> None:
     def _boom(_: dict[str, object]) -> dict[str, object]:
         raise ValueError("boom")
