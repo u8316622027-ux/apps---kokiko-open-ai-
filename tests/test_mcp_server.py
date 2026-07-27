@@ -27,6 +27,7 @@ def test_create_tool_registry_uses_base_handlers() -> None:
         "remove_from_cart",
         "update_cart_item",
         "check_cart",
+        "clear_cart",
         "set_widget_theme",
         "set_widget_language",
         "open_checkout",
@@ -113,6 +114,56 @@ def test_cart_tool_calls_share_active_cart_without_exposing_token() -> None:
     serialized = json.dumps([add_payload, check_payload])
     assert "token" not in serialized.lower()
     assert "access_token" not in serialized.lower()
+
+
+def test_clear_cart_tool_empties_active_cart_for_next_widget() -> None:
+    reset_active_cart_for_tests()
+    try:
+        mcp_server.handle_rpc_request(
+            {
+                "jsonrpc": "2.0",
+                "id": "1",
+                "method": "tools/call",
+                "params": {
+                    "name": "add_to_cart",
+                    "arguments": {
+                        "product": {
+                            "id": "cream-1",
+                            "name": "Face cream",
+                            "price": 99,
+                            "quantity": 2,
+                        }
+                    },
+                },
+            }
+        )
+        clear_response = mcp_server.handle_rpc_request(
+            {
+                "jsonrpc": "2.0",
+                "id": "2",
+                "method": "tools/call",
+                "params": {"name": "clear_cart", "arguments": {}},
+            }
+        )
+        check_response = mcp_server.handle_rpc_request(
+            {
+                "jsonrpc": "2.0",
+                "id": "3",
+                "method": "tools/call",
+                "params": {"name": "check_cart", "arguments": {}},
+            }
+        )
+    finally:
+        reset_active_cart_for_tests()
+
+    clear_payload = clear_response["result"]["structuredContent"]
+    check_payload = check_response["result"]["structuredContent"]
+    assert clear_payload["action"] == "clear"
+    assert clear_payload["cart"]["count"] == 0
+    assert clear_payload["cart"]["items"] == []
+    assert clear_payload["widget"]["open"]["page"] == "cart"
+    assert check_payload["cart"]["count"] == 0
+    assert check_payload["cart"]["items"] == []
 
 
 def test_validate_value_allows_null_for_nullable_object_type() -> None:

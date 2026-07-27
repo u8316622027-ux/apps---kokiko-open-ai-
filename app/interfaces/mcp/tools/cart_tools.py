@@ -97,6 +97,30 @@ def remove_from_cart(
     )
 
 
+def clear_cart(
+    arguments: dict[str, Any],
+    *,
+    client: KokikoCartClientProtocol | None = None,
+) -> dict[str, Any]:
+    """Clear the current cart payload and the active backend cart session."""
+
+    _cart_items, cart_token = _resolve_cart(arguments)
+    sync = _sync_live_cart(
+        [],
+        cart_token=cart_token,
+        language=_normalize_language(arguments.get("language")),
+        client=client,
+        always_create_token=False,
+    )
+    _write_active_cart([], token=sync["token"], synced=sync["synced"])
+    return _build_cart_response(
+        [],
+        status="updated",
+        action="clear",
+        synced=sync["synced"],
+    )
+
+
 def update_cart_item(
     arguments: dict[str, Any],
     *,

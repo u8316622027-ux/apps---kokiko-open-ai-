@@ -62,7 +62,7 @@ def test_submit_order_tool_descriptor_allows_checkout_submission() -> None:
 def test_cart_tools_are_registered_for_text_control() -> None:
     registry = tool_registry.create_tool_registry()
 
-    for name in ("add_to_cart", "remove_from_cart", "update_cart_item", "check_cart"):
+    for name in ("add_to_cart", "remove_from_cart", "update_cart_item", "check_cart", "clear_cart"):
         payload = tool_registry.serialize_tool_definition(registry[name])
         assert payload["outputTemplate"] == WIDGET_TEMPLATE_URI
         assert payload["_meta"]["openai/outputTemplate"] == WIDGET_TEMPLATE_URI
@@ -70,7 +70,14 @@ def test_cart_tools_are_registered_for_text_control() -> None:
 
     assert registry["check_cart"].annotations["readOnlyHint"] is True
     assert registry["add_to_cart"].annotations["readOnlyHint"] is False
-    for name in ("add_to_cart", "remove_from_cart", "update_cart_item", "check_cart", "sync_cart"):
+    for name in (
+        "add_to_cart",
+        "remove_from_cart",
+        "update_cart_item",
+        "check_cart",
+        "clear_cart",
+        "sync_cart",
+    ):
         assert "cart_token" not in registry[name].input_schema["properties"]
 
 

@@ -11,6 +11,7 @@ from app.interfaces.mcp.tools.cart_tools import (
     add_to_cart,
     check_cart,
     clear_active_cart,
+    clear_cart,
     remove_from_cart,
     sync_cart,
     update_cart_item,
@@ -183,6 +184,28 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             tool_invocation={
                 "invoking": "Removing product from cart...",
                 "invoked": "Cart updated.",
+            },
+        ),
+        "clear_cart": ToolDefinition(
+            name="clear_cart",
+            title="Clear cart",
+            description=(
+                "Clear all products from the current cart for text-driven cart control, "
+                "sync the empty cart to Kokiko cart API when a backend cart session exists, "
+                "and return structuredContent.cart with zero items, count, total, and sync status."
+            ),
+            input_schema=_cart_mutation_schema(),
+            handler=_clear_cart_handler,
+            output_template=WIDGET_OUTPUT_TEMPLATE,
+            ui=widget_ui_config,
+            annotations={
+                "readOnlyHint": False,
+                "openWorldHint": False,
+                "destructiveHint": False,
+            },
+            tool_invocation={
+                "invoking": "Clearing cart...",
+                "invoked": "Cart cleared.",
             },
         ),
         "update_cart_item": ToolDefinition(
@@ -425,6 +448,7 @@ def _resolve_widget_page(tool_name: str) -> str:
         "add_to_cart",
         "remove_from_cart",
         "update_cart_item",
+        "clear_cart",
         "check_cart",
         "sync_cart",
     }:
@@ -517,6 +541,10 @@ def _add_to_cart_handler(arguments: dict[str, Any]) -> dict[str, Any]:
 
 def _remove_from_cart_handler(arguments: dict[str, Any]) -> dict[str, Any]:
     return remove_from_cart(arguments)
+
+
+def _clear_cart_handler(arguments: dict[str, Any]) -> dict[str, Any]:
+    return clear_cart(arguments)
 
 
 def _update_cart_item_handler(arguments: dict[str, Any]) -> dict[str, Any]:

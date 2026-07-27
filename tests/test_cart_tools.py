@@ -5,6 +5,7 @@ from __future__ import annotations
 from app.interfaces.mcp.tools.cart_tools import (
     add_to_cart,
     check_cart,
+    clear_cart,
     remove_from_cart,
     reset_active_cart_for_tests,
     sync_cart,
@@ -353,3 +354,32 @@ def test_remove_from_cart_uses_active_cart_when_payload_is_omitted() -> None:
 
     assert payload["cart"]["count"] == 0
     assert check_cart({})["cart"]["items"] == []
+
+
+def test_clear_cart_empties_active_cart_and_live_cart() -> None:
+    client = FakeCartClient()
+    add_to_cart(
+        {
+            "product": {
+                "id": "26078",
+                "name": "Shampoo",
+                "price": 57.27,
+                "quantity": 2,
+            },
+            "language": "ru",
+        },
+        client=client,
+    )
+    client.calls.clear()
+
+    payload = clear_cart({"language": "ru"}, client=client)
+
+    assert payload["status"] == "updated"
+    assert payload["action"] == "clear"
+    assert payload["cart"]["items"] == []
+    assert payload["cart"]["count"] == 0
+    assert payload["cart"]["total"] == 0
+    assert payload["cart"]["synced"] is True
+    assert "token" not in payload["cart"]
+    assert check_cart({})["cart"]["items"] == []
+    assert client.calls == [("clear_cart", {"token": "cart-token-123", "language": "ru"})]
