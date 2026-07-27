@@ -25,6 +25,19 @@ from app.interfaces.mcp.tools.preference_tools import (
 from app.interfaces.mcp.tools.search_tools import search_products
 
 WIDGET_OUTPUT_TEMPLATE = "ui://widget/products.html"
+WIDGET_ACCESSIBLE_TOOL_NAMES = {
+    "search_products",
+    "submit_order",
+    "add_to_cart",
+    "remove_from_cart",
+    "clear_cart",
+    "update_cart_item",
+    "check_cart",
+    "sync_cart",
+    "set_widget_theme",
+    "set_widget_language",
+    "open_checkout",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,7 +67,9 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             description=(
                 "Search products by free-text query via Stage API. "
                 "Args: query and optional limit. "
-                "Returns structuredContent.products and structuredContent.no_results when empty."
+                "Returns structuredContent.products and structuredContent.no_results when empty. "
+                "For multi-step requests such as search-and-add, search silently with "
+                "open_widget:false and let the final cart or checkout action open the widget."
             ),
             input_schema={
                 "type": "object",
@@ -64,6 +79,13 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
                     "language": {
                         "type": "string",
                         "description": "User language preference (ru or ro).",
+                    },
+                    "open_widget": {
+                        "type": "boolean",
+                        "description": (
+                            "Set false when this search is an intermediate step and a later "
+                            "tool call should open the final widget."
+                        ),
                     },
                 },
                 "required": ["query"],
@@ -147,8 +169,13 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             title="Add to cart",
             description=(
                 "Add a product to a cart payload for text-driven cart control, "
+                "reject products without a positive price, "
                 "sync numeric product ids to Kokiko cart API, and return "
-                "structuredContent.cart with the current items, count, total, and sync status."
+                "structuredContent.cart with the current items, count, total, and sync status. "
+                "Only call this tool for products with a positive numeric price; unavailable "
+                "or unpriced products cannot be added. "
+                "For multi-step requests, pass open_widget:false on intermediate add calls "
+                "and allow only the final cart or checkout tool to open the widget."
             ),
             input_schema=_cart_mutation_schema(require_product=True),
             handler=_add_to_cart_handler,
@@ -367,6 +394,12 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
                         "type": "string",
                         "enum": ["light", "dark", "auto"],
                     },
+                    "open_widget": {
+                        "type": "boolean",
+                        "description": (
+                            "Set false when this checkout preparation is an intermediate step."
+                        ),
+                    },
                 },
             },
             handler=_open_checkout_handler,
@@ -408,6 +441,8 @@ def serialize_tool_definition(tool: ToolDefinition) -> dict[str, Any]:
             },
         },
     }
+    if tool.name in WIDGET_ACCESSIBLE_TOOL_NAMES or tool.visibility == "internal":
+        payload["_meta"]["openai/widgetAccessible"] = True
     if tool.tool_invocation:
         if tool.tool_invocation.get("invoking"):
             payload["_meta"]["openai/toolInvocation/invoking"] = tool.tool_invocation["invoking"]
@@ -416,10 +451,10 @@ def serialize_tool_definition(tool: ToolDefinition) -> dict[str, Any]:
     if tool.visibility == "internal":
         payload["_meta"]["ui"] = {"visibility": ["app"]}
         payload["_meta"]["openai/visibility"] = "private"
-        payload["_meta"]["openai/widgetAccessible"] = True
     if tool.output_template:
         payload["outputTemplate"] = tool.output_template
         payload["_meta"]["openai/outputTemplate"] = tool.output_template
+        payload["_meta"].setdefault("ui", {})["resourceUri"] = tool.output_template
     if tool.annotations:
         payload["annotations"] = dict(tool.annotations)
     return payload
@@ -429,6 +464,7 @@ def decorate_tool_result(
     tool_name: str, tool: ToolDefinition, result_payload: dict[str, Any]
 ) -> dict[str, Any]:
     payload = dict(result_payload)
+    open_widget = payload.pop("open_widget", True) is not False
 
     if tool_name == "search_products":
         products = payload.get("products")
@@ -439,7 +475,7 @@ def decorate_tool_result(
         payload["products"] = normalized_products
         payload["no_results"] = len(normalized_products) == 0
 
-    if tool.output_template:
+    if tool.output_template and open_widget:
         payload["widget"] = {
             "open": {
                 "template": tool.output_template,
@@ -491,11 +527,20 @@ def _cart_mutation_schema(
             },
             "product": {
                 "type": "object",
-                "description": "Product to add: id, name, price, quantity, image_url, product_url.",
+                "description": (
+                    "Product to add: id, name, positive price, quantity, image_url, product_url."
+                ),
             },
             "product_id": {"type": "string"},
             "quantity": {"type": "integer", "minimum": quantity_minimum},
             "language": {"type": "string"},
+            "open_widget": {
+                "type": "boolean",
+                "description": (
+                    "Set false when this cart operation is an intermediate step and a later "
+                    "tool call should open the final widget."
+                ),
+            },
         },
         "required": required,
     }
@@ -537,7 +582,10 @@ def _search_products_handler(arguments: dict[str, Any]) -> dict[str, Any]:
     query = str(arguments.get("query", ""))
     limit = int(arguments.get("limit", 10))
     language = arguments.get("language")
-    return search_products(query, limit=limit, language=language)
+    return _apply_open_widget_preference(
+        search_products(query, limit=limit, language=language),
+        arguments,
+    )
 
 
 def _submit_order_handler(arguments: dict[str, Any]) -> dict[str, Any]:
@@ -547,27 +595,27 @@ def _submit_order_handler(arguments: dict[str, Any]) -> dict[str, Any]:
 
 
 def _add_to_cart_handler(arguments: dict[str, Any]) -> dict[str, Any]:
-    return add_to_cart(arguments)
+    return _apply_open_widget_preference(add_to_cart(arguments), arguments)
 
 
 def _remove_from_cart_handler(arguments: dict[str, Any]) -> dict[str, Any]:
-    return remove_from_cart(arguments)
+    return _apply_open_widget_preference(remove_from_cart(arguments), arguments)
 
 
 def _clear_cart_handler(arguments: dict[str, Any]) -> dict[str, Any]:
-    return clear_cart(arguments)
+    return _apply_open_widget_preference(clear_cart(arguments), arguments)
 
 
 def _update_cart_item_handler(arguments: dict[str, Any]) -> dict[str, Any]:
-    return update_cart_item(arguments)
+    return _apply_open_widget_preference(update_cart_item(arguments), arguments)
 
 
 def _check_cart_handler(arguments: dict[str, Any]) -> dict[str, Any]:
-    return check_cart(arguments)
+    return _apply_open_widget_preference(check_cart(arguments), arguments)
 
 
 def _sync_cart_handler(arguments: dict[str, Any]) -> dict[str, Any]:
-    return sync_cart(arguments)
+    return _apply_open_widget_preference(sync_cart(arguments), arguments)
 
 
 def _set_widget_theme_handler(arguments: dict[str, Any]) -> dict[str, Any]:
@@ -579,4 +627,15 @@ def _set_widget_language_handler(arguments: dict[str, Any]) -> dict[str, Any]:
 
 
 def _open_checkout_handler(arguments: dict[str, Any]) -> dict[str, Any]:
-    return open_checkout(arguments)
+    return _apply_open_widget_preference(open_checkout(arguments), arguments)
+
+
+def _apply_open_widget_preference(
+    payload: dict[str, Any],
+    arguments: dict[str, Any],
+) -> dict[str, Any]:
+    if arguments.get("open_widget") is not False:
+        return payload
+    next_payload = dict(payload)
+    next_payload["open_widget"] = False
+    return next_payload

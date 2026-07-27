@@ -114,6 +114,39 @@ def test_add_to_cart_syncs_numeric_products_with_kokiko_cart() -> None:
     ]
 
 
+def test_add_to_cart_rejects_unpriced_product_without_mutating_active_cart() -> None:
+    add_to_cart(
+        {
+            "product": {
+                "id": "cream-1",
+                "name": "Face cream",
+                "price": 99,
+                "quantity": 1,
+            }
+        }
+    )
+
+    try:
+        add_to_cart(
+            {
+                "product": {
+                    "id": "unpriced-1",
+                    "name": "Unavailable shampoo",
+                    "price": 0,
+                    "quantity": 1,
+                }
+            }
+        )
+    except ValueError as exc:
+        assert "price" in str(exc).lower()
+    else:
+        raise AssertionError("Expected add_to_cart to reject an unpriced product")
+
+    payload = check_cart({})
+    assert payload["cart"]["count"] == 1
+    assert payload["cart"]["items"][0]["id"] == "cream-1"
+
+
 def test_update_cart_item_sets_quantity() -> None:
     payload = update_cart_item(
         {

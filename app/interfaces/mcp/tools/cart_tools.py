@@ -40,6 +40,8 @@ def add_to_cart(
     product = _normalize_product(raw_product)
     if product is None:
         raise ValueError("product is required")
+    if float(product["price"]) <= 0:
+        raise ValueError("product price is required")
     if (
         isinstance(raw_product, dict)
         and "quantity" not in raw_product

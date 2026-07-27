@@ -166,6 +166,36 @@ def test_clear_cart_tool_empties_active_cart_for_next_widget() -> None:
     assert check_payload["cart"]["items"] == []
 
 
+def test_tool_call_can_suppress_widget_for_intermediate_steps() -> None:
+    reset_active_cart_for_tests()
+    try:
+        response = mcp_server.handle_rpc_request(
+            {
+                "jsonrpc": "2.0",
+                "id": "1",
+                "method": "tools/call",
+                "params": {
+                    "name": "add_to_cart",
+                    "arguments": {
+                        "open_widget": False,
+                        "product": {
+                            "id": "cream-1",
+                            "name": "Face cream",
+                            "price": 99,
+                            "quantity": 1,
+                        },
+                    },
+                },
+            }
+        )
+    finally:
+        reset_active_cart_for_tests()
+
+    payload = response["result"]["structuredContent"]
+    assert payload["cart"]["count"] == 1
+    assert "widget" not in payload
+
+
 def test_validate_value_allows_null_for_nullable_object_type() -> None:
     schema = {
         "type": "object",

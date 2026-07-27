@@ -70,6 +70,10 @@ def test_cart_tools_are_registered_for_text_control() -> None:
 
     assert registry["check_cart"].annotations["readOnlyHint"] is True
     assert registry["add_to_cart"].annotations["readOnlyHint"] is False
+    assert (
+        registry["search_products"].input_schema["properties"]["open_widget"]["type"] == "boolean"
+    )
+    assert registry["add_to_cart"].input_schema["properties"]["open_widget"]["type"] == "boolean"
     assert registry["remove_from_cart"].visibility == "internal"
     remove_payload = tool_registry.serialize_tool_definition(registry["remove_from_cart"])
     assert remove_payload["_meta"]["ui"]["visibility"] == ["app"]
@@ -85,6 +89,22 @@ def test_cart_tools_are_registered_for_text_control() -> None:
         "sync_cart",
     ):
         assert "cart_token" not in registry[name].input_schema["properties"]
+
+
+def test_widget_callable_tools_are_marked_widget_accessible() -> None:
+    registry = tool_registry.create_tool_registry()
+
+    for name in (
+        "search_products",
+        "add_to_cart",
+        "update_cart_item",
+        "clear_cart",
+        "check_cart",
+        "sync_cart",
+        "submit_order",
+    ):
+        payload = tool_registry.serialize_tool_definition(registry[name])
+        assert payload["_meta"]["openai/widgetAccessible"] is True
 
 
 def test_sync_cart_tool_is_registered_for_widget_bootstrap() -> None:
