@@ -257,7 +257,7 @@ def test_tools_list_cache_refreshes_after_reset(monkeypatch: pytest.MonkeyPatch)
     assert second["tools"][0]["ui"]["domain"] == "https://example-b.test"
 
 
-def test_tools_list_hides_internal_tools_but_keeps_them_callable() -> None:
+def test_tools_list_keeps_internal_tools_app_only_and_callable() -> None:
     registry = {
         "public_demo": tool_registry.ToolDefinition(
             name="public_demo",
@@ -282,9 +282,13 @@ def test_tools_list_hides_internal_tools_but_keeps_them_callable() -> None:
         {"jsonrpc": "2.0", "id": "1", "method": "tools/list"},
         registry=registry,
     )
-    tool_names = [tool["name"] for tool in list_response["result"]["tools"]]
+    tools_by_name = {tool["name"]: tool for tool in list_response["result"]["tools"]}
 
-    assert tool_names == ["public_demo"]
+    assert set(tools_by_name) == {"public_demo", "internal_demo"}
+    internal_meta = tools_by_name["internal_demo"]["_meta"]
+    assert internal_meta["ui"]["visibility"] == ["app"]
+    assert internal_meta["openai/visibility"] == "private"
+    assert internal_meta["openai/widgetAccessible"] is True
 
     call_response = mcp_server.handle_rpc_request(
         {
@@ -299,17 +303,22 @@ def test_tools_list_hides_internal_tools_but_keeps_them_callable() -> None:
     assert call_response["result"]["structuredContent"]["status"] == "internal"
 
 
-def test_default_tools_list_hides_sync_cart_from_user_tools() -> None:
+def test_default_tools_list_keeps_internal_cart_tools_app_only() -> None:
     mcp_server._reset_server_caches_for_tests()
 
     response = mcp_server.handle_rpc_request({"jsonrpc": "2.0", "id": "1", "method": "tools/list"})
 
-    tool_names = [tool["name"] for tool in response["result"]["tools"]]
-    assert "sync_cart" not in tool_names
-    assert "remove_from_cart" not in tool_names
-    assert "add_to_cart" in tool_names
-    assert "update_cart_item" in tool_names
-    assert "clear_cart" in tool_names
+    tools_by_name = {tool["name"]: tool for tool in response["result"]["tools"]}
+    assert "sync_cart" in tools_by_name
+    assert "remove_from_cart" in tools_by_name
+    assert "add_to_cart" in tools_by_name
+    assert "update_cart_item" in tools_by_name
+    assert "clear_cart" in tools_by_name
+    for name in ("sync_cart", "remove_from_cart"):
+        meta = tools_by_name[name]["_meta"]
+        assert meta["ui"]["visibility"] == ["app"]
+        assert meta["openai/visibility"] == "private"
+        assert meta["openai/widgetAccessible"] is True
 
 
 def test_widget_resource_uses_products_template() -> None:

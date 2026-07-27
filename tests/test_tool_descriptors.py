@@ -71,6 +71,10 @@ def test_cart_tools_are_registered_for_text_control() -> None:
     assert registry["check_cart"].annotations["readOnlyHint"] is True
     assert registry["add_to_cart"].annotations["readOnlyHint"] is False
     assert registry["remove_from_cart"].visibility == "internal"
+    remove_payload = tool_registry.serialize_tool_definition(registry["remove_from_cart"])
+    assert remove_payload["_meta"]["ui"]["visibility"] == ["app"]
+    assert remove_payload["_meta"]["openai/visibility"] == "private"
+    assert remove_payload["_meta"]["openai/widgetAccessible"] is True
     assert registry["update_cart_item"].input_schema["properties"]["quantity"]["minimum"] == 0
     for name in (
         "add_to_cart",
