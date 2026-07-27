@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
-from app.interfaces.mcp.tools.order_tools import KokikoOrderClient, submit_order
+from app.interfaces.mcp.tools.order_tools import (
+    DEFAULT_N8N_ORDER_WEBHOOK_URL,
+    KokikoOrderClient,
+    N8nOrderWebhookClient,
+    submit_order,
+)
 
 
 class FakeResponse:
@@ -59,6 +66,15 @@ class FakeKokikoOrderClient:
             )
         )
         return {"id": 770001, "number": 9001, "amount": 198.0}
+
+
+class FakeOrderWebhookClient:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def send(self, payload: dict[str, object]) -> dict[str, object]:
+        self.calls.append(payload)
+        return {"status": "sent", "response": {"ok": True}}
 
 
 def test_submit_order_returns_received_payload() -> None:
@@ -297,6 +313,90 @@ def test_kokiko_order_client_uses_site_cart_and_order_endpoints(
     assert requests[2][0].get_header("Authorization") == "Bearer cart-token-123"
     assert requests[2][0].get_header("Platform") == "web"
     assert requests[2][0].get_header("Market") == "kokikomd"
+
+
+def test_order_submission_client_uses_stage_order_base(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("APTEKA_BASE_URL", "https://api.example")
+    monkeypatch.setenv("APTEKA_ORDER_BASE_URL", "https://stage.example")
+    requests = []
+    responses = [
+        '{"accessToken":"stage-cart-token","tokenType":"Bearer"}',
+        "{}",
+        '{"id":880001}',
+    ]
+
+    def fake_urlopen(request: object, timeout: float) -> FakeResponse:
+        requests.append((request, timeout))
+        return FakeResponse(responses.pop(0))
+
+    client = KokikoOrderClient.for_order_submission(urlopen=fake_urlopen, timeout=3.0)
+
+    token = client.create_cart(language="ru")
+    client.update_cart(token, [{"product_id": 123, "quantity": 2}], language="ru")
+    client.send_order(
+        token,
+        {"orderType": "online"},
+        language="ru",
+        platform="web",
+    )
+
+    assert token == "stage-cart-token"
+    assert [request.full_url for request, _timeout in requests] == [
+        "https://stage.example/api/v1/front/cart",
+        "https://stage.example/api/v1/front/cart/update",
+        "https://stage.example/api/v1/front/order/confirm-order-by-using-mobile",
+    ]
+
+
+def test_n8n_order_webhook_client_posts_order_payload() -> None:
+    captured: dict[str, object] = {}
+
+    def fake_urlopen(request: object, timeout: float) -> FakeResponse:
+        captured["request"] = request
+        captured["timeout"] = timeout
+        return FakeResponse('{"ok":true}')
+
+    client = N8nOrderWebhookClient(urlopen=fake_urlopen, timeout=4.0)
+    result = client.send({"order": {"id": 770001}})
+
+    request = captured["request"]
+    assert result == {"status": "sent", "response": {"ok": True}}
+    assert request.full_url == DEFAULT_N8N_ORDER_WEBHOOK_URL
+    assert request.get_method() == "POST"
+    assert request.get_header("Accept") == "application/json"
+    assert request.get_header("Content-type") == "application/json; charset=utf-8"
+    assert json.loads(request.data.decode("utf-8")) == {"order": {"id": 770001}}
+    assert captured["timeout"] == 4.0
+
+
+def test_submit_order_sends_n8n_webhook_with_order_data() -> None:
+    client = FakeKokikoOrderClient()
+    webhook = FakeOrderWebhookClient()
+
+    payload = submit_order(
+        {
+            "customer_name": "Ana Popescu",
+            "customer_phone": "079 802 000",
+            "delivery_method": "pickup",
+            "payment_method": "cash",
+            "items": [{"id": 123, "name": "Face cream", "price": 99, "quantity": 1}],
+        },
+        client=client,
+        webhook_client=webhook,
+    )
+
+    assert payload["webhook"] == {"status": "sent", "response": {"ok": True}}
+    assert len(webhook.calls) == 1
+    webhook_payload = webhook.calls[0]
+    assert webhook_payload["event"] == "kokiko_order_submitted"
+    assert webhook_payload["source"] == "openai_mcp"
+    assert webhook_payload["cart_token"] == "cart-token-123"
+    assert webhook_payload["request"]["customer_name"] == "Ana Popescu"
+    assert webhook_payload["order_payload"]["delivery"]["type"] == "pick-up"
+    assert webhook_payload["result"]["order_id"] == "770001"
+    assert webhook_payload["result"]["items"][0]["name"] == "Face cream"
 
 
 @pytest.mark.parametrize(

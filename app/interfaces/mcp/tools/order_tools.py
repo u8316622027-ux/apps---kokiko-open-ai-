@@ -8,7 +8,10 @@ from urllib.error import HTTPError
 from urllib.request import Request
 from urllib.request import urlopen as default_urlopen
 
-from app.interfaces.mcp.tools.apteka_urls import build_front_url
+from app.interfaces.mcp.tools.apteka_urls import (
+    get_apteka_base_url,
+    get_apteka_order_base_url,
+)
 
 KOKIKO_MARKET_HEADER_VALUE = "kokikomd"
 KOKIKO_DEFAULT_LANGUAGE = "ru"
@@ -18,6 +21,7 @@ KOKIKO_DEFAULT_REGION_ID = 2
 KOKIKO_DEFAULT_SECTOR_ID = 1550
 KOKIKO_DEFAULT_CITY = "Chisinau"
 KOKIKO_ORDER_CONFIRM_PATH = "/order/confirm-order-by-using-mobile"
+DEFAULT_N8N_ORDER_WEBHOOK_URL = "https://stage-n8n.idoctor.md/webhook/order"
 
 
 class KokikoOrderClientProtocol(Protocol):
@@ -41,6 +45,10 @@ class KokikoOrderClientProtocol(Protocol):
     ) -> dict[str, Any]: ...
 
 
+class OrderWebhookClientProtocol(Protocol):
+    def send(self, payload: dict[str, Any]) -> dict[str, Any]: ...
+
+
 class KokikoOrderClient:
     """HTTP client for the same cart and order endpoints used by kokiko.md."""
 
@@ -49,9 +57,24 @@ class KokikoOrderClient:
         *,
         timeout: float = 15.0,
         urlopen: Callable[..., Any] = default_urlopen,
+        base_url: str | None = None,
     ) -> None:
         self._timeout = timeout
         self._urlopen = urlopen
+        self._base_url = (base_url or get_apteka_base_url()).rstrip("/")
+
+    @classmethod
+    def for_order_submission(
+        cls,
+        *,
+        timeout: float = 15.0,
+        urlopen: Callable[..., Any] = default_urlopen,
+    ) -> "KokikoOrderClient":
+        return cls(
+            timeout=timeout,
+            urlopen=urlopen,
+            base_url=get_apteka_order_base_url(),
+        )
 
     def create_cart(self, *, language: str) -> str:
         payload = self._request_json("GET", "/cart", language=language)
@@ -140,7 +163,7 @@ class KokikoOrderClient:
         if payload is not None:
             data = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         request = Request(
-            url=build_front_url(path),
+            url=self._build_front_url(path),
             data=data,
             method=method,
             headers=_build_kokiko_headers(language=language, token=token, platform=platform),
@@ -159,11 +182,54 @@ class KokikoOrderClient:
         except json.JSONDecodeError as error:
             raise ValueError("Kokiko API returned invalid JSON") from error
 
+    def _build_front_url(self, path: str) -> str:
+        normalized_path = path if path.startswith("/") else f"/{path}"
+        return f"{self._base_url}/api/v1/front{normalized_path}"
+
+
+class N8nOrderWebhookClient:
+    """Posts submitted Kokiko orders to the n8n notification webhook."""
+
+    def __init__(
+        self,
+        *,
+        webhook_url: str = DEFAULT_N8N_ORDER_WEBHOOK_URL,
+        timeout: float = 10.0,
+        urlopen: Callable[..., Any] = default_urlopen,
+    ) -> None:
+        self._webhook_url = webhook_url
+        self._timeout = timeout
+        self._urlopen = urlopen
+
+    def send(self, payload: dict[str, Any]) -> dict[str, Any]:
+        data = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        request = Request(
+            url=self._webhook_url,
+            data=data,
+            method="POST",
+            headers={
+                "Content-Type": "application/json; charset=utf-8",
+                "Accept": "application/json",
+            },
+        )
+        with self._urlopen(request, timeout=self._timeout) as response:
+            raw_payload = response.read().decode("utf-8")
+
+        if not raw_payload.strip():
+            response_payload: Any = {}
+        else:
+            try:
+                response_payload = json.loads(raw_payload)
+            except json.JSONDecodeError:
+                response_payload = raw_payload
+        return {"status": "sent", "response": response_payload}
+
 
 def submit_order(
     arguments: dict[str, Any],
     *,
     client: KokikoOrderClientProtocol | None = None,
+    webhook_client: OrderWebhookClientProtocol | None = None,
 ) -> dict[str, Any]:
     """Validate, sync cart with Kokiko API, and submit a checkout order."""
 
@@ -188,9 +254,13 @@ def submit_order(
     total = round(sum(item["price"] * item["quantity"] for item in items), 2)
     language = _normalize_language(arguments.get("language"))
     platform = _normalize_text(arguments.get("platform")) or KOKIKO_DEFAULT_PLATFORM
-    effective_client = client or KokikoOrderClient()
+    using_default_client = client is None
+    effective_client = client or KokikoOrderClient.for_order_submission()
 
-    cart_token = _extract_cart_token(arguments) or effective_client.create_cart(language=language)
+    cart_token = ""
+    if not using_default_client:
+        cart_token = _extract_cart_token(arguments)
+    cart_token = cart_token or effective_client.create_cart(language=language)
     effective_client.update_cart(
         cart_token,
         [{"product_id": int(item["id"]), "quantity": int(item["quantity"])} for item in items],
@@ -220,7 +290,7 @@ def submit_order(
         upstream_order.get("number") if isinstance(upstream_order, dict) else None
     )
 
-    return {
+    result_payload = {
         "status": "submitted",
         "order_id": upstream_order_id,
         "order_number": upstream_order_number,
@@ -238,6 +308,48 @@ def submit_order(
         "total": total,
         "upstream_order": upstream_order,
     }
+    if webhook_client is not None or using_default_client:
+        effective_webhook_client = webhook_client or N8nOrderWebhookClient()
+        result_payload["webhook"] = _send_order_webhook(
+            effective_webhook_client,
+            arguments=arguments,
+            cart_token=cart_token,
+            language=language,
+            platform=platform,
+            order_payload=order_payload,
+            result_payload=result_payload,
+        )
+    return result_payload
+
+
+def _send_order_webhook(
+    webhook_client: OrderWebhookClientProtocol,
+    *,
+    arguments: dict[str, Any],
+    cart_token: str,
+    language: str,
+    platform: str,
+    order_payload: dict[str, Any],
+    result_payload: dict[str, Any],
+) -> dict[str, Any]:
+    webhook_payload = {
+        "event": "kokiko_order_submitted",
+        "source": "openai_mcp",
+        "language": language,
+        "platform": platform,
+        "cart_token": cart_token,
+        "request": _json_safe(arguments),
+        "order_payload": _json_safe(order_payload),
+        "result": _json_safe(result_payload),
+    }
+    try:
+        return webhook_client.send(webhook_payload)
+    except Exception as error:  # pragma: no cover - defensive network boundary
+        return {"status": "failed", "error": str(error)}
+
+
+def _json_safe(value: Any) -> Any:
+    return json.loads(json.dumps(value, ensure_ascii=False, default=str))
 
 
 def _normalize_order_items(raw_items: Any) -> list[dict[str, Any]]:

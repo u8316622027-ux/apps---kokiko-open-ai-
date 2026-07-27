@@ -1931,6 +1931,53 @@
       return "";
     };
 
+    const clearCheckoutControlValidation = (control) => {
+      if (!(control instanceof HTMLElement)) {
+        return;
+      }
+      let isValidNow = false;
+      if (control === checkoutPhone) {
+        isValidNow = Boolean(
+          getCheckoutPhoneNationalDigits() &&
+            getFullCheckoutPhone() &&
+            !validateCheckoutPhone(),
+        );
+      } else if (control instanceof HTMLSelectElement) {
+        isValidNow = Boolean(getCheckoutValue(control));
+      } else if (
+        control instanceof HTMLInputElement ||
+        control instanceof HTMLTextAreaElement
+      ) {
+        if (control.type === "checkbox" || control.type === "radio") {
+          isValidNow = control.checked;
+        } else {
+          isValidNow = Boolean(getCheckoutValue(control));
+        }
+      }
+      if (isValidNow) {
+        setControlInvalid(control, false);
+      }
+      if (
+        control instanceof HTMLInputElement &&
+        control.name === "products-payment-method" &&
+        getSelectedPaymentMethod()
+      ) {
+        const paymentFieldset = checkoutForm?.querySelector(
+          ".products-payment-methods",
+        );
+        if (paymentFieldset instanceof HTMLElement) {
+          paymentFieldset.removeAttribute("aria-invalid");
+        }
+      }
+      renderCustomSelects();
+      const invalidControl = checkoutForm?.querySelector(
+        '[aria-invalid="true"], .products-payment-methods[aria-invalid="true"]',
+      );
+      if (!invalidControl && checkoutStatus?.dataset.tone === "error") {
+        setCheckoutStatus("", "");
+      }
+    };
+
     const getSelectedDeliveryWindow = () => {
       const selected =
         checkoutForm instanceof HTMLElement
@@ -2776,6 +2823,7 @@
     ctx.ui.renderCart = renderCart;
     ctx.ui.renderCheckout = renderCheckout;
     ctx.ui.renderCheckoutPhoneMask = renderCheckoutPhoneMask;
+    ctx.ui.clearCheckoutControlValidation = clearCheckoutControlValidation;
     ctx.ui.toggleCart = setCartOpen;
     ctx.ui.toggleCheckout = setCheckoutOpen;
     ctx.actions.addToCart = addToCart;

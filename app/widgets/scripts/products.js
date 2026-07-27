@@ -204,6 +204,9 @@
 
   checkoutForm?.addEventListener("change", (event) => {
     const target = event.target instanceof HTMLElement ? event.target : null;
+    if (typeof ui.clearCheckoutControlValidation === "function") {
+      ui.clearCheckoutControlValidation(target);
+    }
     if (target === checkoutCountry) {
       actions.formatCheckoutPhone();
       ui.renderCheckoutPhoneMask();
@@ -240,6 +243,13 @@
     }
     if (state.checkoutStep === "address") {
       void actions.refreshCheckoutDeliveryData();
+    }
+  });
+
+  checkoutForm?.addEventListener("input", (event) => {
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    if (typeof ui.clearCheckoutControlValidation === "function") {
+      ui.clearCheckoutControlValidation(target);
     }
   });
 

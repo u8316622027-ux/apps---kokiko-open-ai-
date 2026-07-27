@@ -1616,6 +1616,9 @@ test("products checkout only offers cash and card on delivery payment", async ({
     .locator('input[name="products-payment-method"]')
     .evaluateAll((inputs) => inputs.map((input) => input.value));
   expect(paymentValues).toEqual(["cash", "card"]);
+  await expect(
+    page.locator('input[name="products-payment-method"][value="cash"]'),
+  ).toBeChecked();
   await expect(page.locator('input[value="maib"]')).toHaveCount(0);
   await expect(page.locator('input[value="mia"]')).toHaveCount(0);
   await expect(page.locator('input[value="cashless_individual"]')).toHaveCount(
@@ -1669,6 +1672,23 @@ test("products checkout validates required pickup address fields", async ({
     "aria-invalid",
     "true",
   );
+
+  await page.locator("#products-checkout-flow-name").fill("Ana Popescu");
+  await expect(
+    page.locator("#products-checkout-flow-name"),
+  ).not.toHaveAttribute("aria-invalid", "true");
+  await page.locator("#products-checkout-flow-phone").fill("79703000");
+  await expect(
+    page.locator("#products-checkout-flow-phone"),
+  ).not.toHaveAttribute("aria-invalid", "true");
+  await page.locator("#products-checkout-flow-region").selectOption("2");
+  await expect(
+    page.locator("#products-checkout-flow-region"),
+  ).not.toHaveAttribute("aria-invalid", "true");
+  await page.locator("#products-checkout-flow-sector").selectOption("1550");
+  await expect(
+    page.locator("#products-checkout-flow-sector"),
+  ).not.toHaveAttribute("aria-invalid", "true");
 });
 
 test("products checkout validates required courier address fields", async ({

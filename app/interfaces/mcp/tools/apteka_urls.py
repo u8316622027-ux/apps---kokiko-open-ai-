@@ -9,6 +9,7 @@ from app.core.env import read_env_file_value
 
 ENV_FILE_PATH = Path(__file__).resolve().parents[4] / ".env"
 DEFAULT_APTEKA_BASE_URL = "https://api.apteka.md"
+DEFAULT_APTEKA_ORDER_BASE_URL = "https://stage.apteka.md"
 
 
 def get_apteka_base_url() -> str:
@@ -21,9 +22,24 @@ def get_apteka_base_url() -> str:
     return DEFAULT_APTEKA_BASE_URL
 
 
+def get_apteka_order_base_url() -> str:
+    raw = str(os.getenv("APTEKA_ORDER_BASE_URL", "")).strip()
+    if raw:
+        return raw.rstrip("/")
+    from_file = read_env_file_value("APTEKA_ORDER_BASE_URL", env_path=ENV_FILE_PATH).strip()
+    if from_file:
+        return from_file.rstrip("/")
+    return DEFAULT_APTEKA_ORDER_BASE_URL
+
+
 def build_front_url(path: str) -> str:
     normalized_path = path if path.startswith("/") else f"/{path}"
     return f"{get_apteka_base_url()}/api/v1/front{normalized_path}"
+
+
+def build_order_front_url(path: str) -> str:
+    normalized_path = path if path.startswith("/") else f"/{path}"
+    return f"{get_apteka_order_base_url()}/api/v1/front{normalized_path}"
 
 
 def build_api_url(path: str) -> str:
