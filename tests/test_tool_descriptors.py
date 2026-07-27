@@ -100,6 +100,7 @@ def test_widget_ui_config_includes_resource_and_connect_domains(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("MCP_WIDGET_DOMAIN", "https://widgets.example")
+    monkeypatch.setenv("APTEKA_BASE_URL", "https://api.apteka.md")
     mcp_server._reset_server_caches_for_tests()
 
     registry = tool_registry.create_tool_registry()
@@ -108,8 +109,9 @@ def test_widget_ui_config_includes_resource_and_connect_domains(
 
     assert "https://widgets.example" in csp["resourceDomains"]
     assert get_apteka_base_url() in csp["connectDomains"]
-    assert "https://stage.apteka.md" in csp["resourceDomains"]
     assert "https://api.apteka.md" in csp["resourceDomains"]
+    assert "https://stage.apteka.md" not in csp["connectDomains"]
+    assert "https://stage.apteka.md" not in csp["resourceDomains"]
     assert "https://cdn.jsdelivr.net" not in csp["resourceDomains"]
 
 
