@@ -6,6 +6,7 @@ import json
 from dataclasses import asdict
 from typing import Any, Callable
 from urllib.error import HTTPError, URLError
+from urllib.parse import urljoin, urlsplit, urlunsplit
 from urllib.request import Request
 from urllib.request import urlopen as default_urlopen
 
@@ -17,6 +18,8 @@ from app.interfaces.mcp.tools.apteka_urls import build_front_url, get_apteka_bas
 APTEKA_SEARCH_PATH = "/search"
 APTEKA_MARKET_HEADER_NAME = "market"
 APTEKA_MARKET_HEADER_VALUE = "kokikomd"
+APTEKA_IMAGE_CDN_BASE_URL = "https://api.apteka.md"
+APTEKA_STAGE_HOST = "stage.apteka.md"
 
 
 class AptekaSearchRepository(ProductSearchRepository):
@@ -213,6 +216,7 @@ def _product_to_dict(product: ProductSummary, *, language: str = "ru") -> dict[s
         preferred_name = product.name_ru or product.name_ro
     payload["name"] = preferred_name
     payload["internationalName"] = payload.pop("international_name")
+    payload["image_url"] = _normalize_image_url_for_widget(product.image_url)
     return payload
 
 
@@ -223,6 +227,36 @@ def _normalize_language(language: str | None) -> str:
     if normalized.startswith("ru"):
         return "ru"
     return ""
+
+
+def _normalize_image_url_for_widget(image_url: str | None) -> str | None:
+    normalized = str(image_url or "").strip()
+    if not normalized:
+        return None
+    if normalized.startswith("data:"):
+        return normalized
+
+    target_url = normalized
+    parsed = urlsplit(target_url)
+    if not parsed.scheme and not parsed.netloc:
+        target_url = urljoin(f"{APTEKA_IMAGE_CDN_BASE_URL}/", normalized.lstrip("/"))
+        parsed = urlsplit(target_url)
+
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return normalized
+
+    host = (parsed.hostname or "").lower()
+    if host == APTEKA_STAGE_HOST:
+        return urlunsplit(
+            (
+                "https",
+                urlsplit(APTEKA_IMAGE_CDN_BASE_URL).netloc,
+                parsed.path,
+                parsed.query,
+                parsed.fragment,
+            )
+        )
+    return target_url
 
 
 def _extract_image_url(item: dict[str, Any]) -> str | None:

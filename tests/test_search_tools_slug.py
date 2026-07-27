@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import json
 
+from app.core.config import get_settings
+from app.domain.products.entities import ProductSummary
 from app.interfaces.mcp.tools.search_tools import (
     AptekaSearchRepository,
     _map_product,
     _product_to_dict,
+    search_products,
 )
 
 
@@ -75,3 +78,34 @@ def test_search_repository_sends_market_header() -> None:
     headers = {key.lower(): value for key, value in captured["headers"].items()}
     assert headers["content-type"] == "application/json"
     assert headers["market"] == "kokikomd"
+
+
+def test_search_products_rewrites_stage_image_urls_to_api_cdn(monkeypatch) -> None:
+    monkeypatch.setenv("MCP_WIDGET_DOMAIN", "https://widgets.example")
+    get_settings.cache_clear()
+
+    class _Repository:
+        def search(self, query, limit=None):  # type: ignore[no-untyped-def]
+            return [
+                ProductSummary(
+                    id="54490",
+                    name_ro="Sampon",
+                    name_ru="Шампунь",
+                    manufacturer="LORENAY",
+                    international_name=None,
+                    country=None,
+                    price=66.99,
+                    discount_price=None,
+                    description_ro=None,
+                    description_ru=None,
+                    image_url="https://stage.apteka.md/media/7311733/conversions/54490-full.webp",
+                    product_url=None,
+                    slug_ro=None,
+                    slug_ru=None,
+                )
+            ]
+
+    result = search_products("шампунь", repository=_Repository())
+    image_url = result["products"][0]["image_url"]
+
+    assert image_url == "https://api.apteka.md/media/7311733/conversions/54490-full.webp"

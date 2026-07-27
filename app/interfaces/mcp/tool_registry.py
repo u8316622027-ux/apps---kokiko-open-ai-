@@ -480,11 +480,16 @@ def _build_widget_ui_config() -> dict[str, Any]:
         or "https://subgerminal-yevette-lactogenic.ngrok-free.dev"
     )
     apteka_base_url = get_apteka_base_url()
-    resource_domains = [
-        widget_domain,
-        apteka_base_url,
-        "https://www.apteka.md",
-    ]
+    resource_domains = list(
+        dict.fromkeys(
+            [
+                widget_domain,
+                apteka_base_url,
+                "https://api.apteka.md",
+                "https://www.apteka.md",
+            ]
+        )
+    )
     return {
         "domain": widget_domain,
         "csp": {

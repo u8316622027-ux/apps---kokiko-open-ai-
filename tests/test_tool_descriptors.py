@@ -108,6 +108,8 @@ def test_widget_ui_config_includes_resource_and_connect_domains(
 
     assert "https://widgets.example" in csp["resourceDomains"]
     assert get_apteka_base_url() in csp["connectDomains"]
+    assert "https://stage.apteka.md" in csp["resourceDomains"]
+    assert "https://api.apteka.md" in csp["resourceDomains"]
     assert "https://cdn.jsdelivr.net" not in csp["resourceDomains"]
 
 
