@@ -306,6 +306,7 @@ def test_default_tools_list_hides_sync_cart_from_user_tools() -> None:
 
     tool_names = [tool["name"] for tool in response["result"]["tools"]]
     assert "sync_cart" not in tool_names
+    assert "remove_from_cart" not in tool_names
     assert "add_to_cart" in tool_names
     assert "update_cart_item" in tool_names
     assert "clear_cart" in tool_names

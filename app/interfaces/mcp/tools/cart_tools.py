@@ -131,12 +131,17 @@ def update_cart_item(
     product_id = _normalize_text(arguments.get("product_id") or arguments.get("id"))
     if not product_id:
         raise ValueError("product_id is required")
-    quantity = _normalize_quantity(arguments.get("quantity"))
+    quantity = _normalize_quantity(arguments.get("quantity"), minimum=0)
     cart_items, cart_token = _resolve_cart(arguments)
-    for item in cart_items:
-        if item["id"] == product_id:
-            item["quantity"] = quantity
-            break
+    action = "update"
+    if quantity == 0:
+        cart_items = [item for item in cart_items if item["id"] != product_id]
+        action = "remove"
+    else:
+        for item in cart_items:
+            if item["id"] == product_id:
+                item["quantity"] = quantity
+                break
     sync = _sync_live_cart(
         cart_items,
         cart_token=cart_token,
@@ -147,7 +152,7 @@ def update_cart_item(
     return _build_cart_response(
         cart_items,
         status="updated",
-        action="update",
+        action=action,
         synced=sync["synced"],
     )
 
@@ -374,12 +379,12 @@ def _normalize_price(value: Any) -> float:
     return round(price, 2)
 
 
-def _normalize_quantity(value: Any) -> int:
+def _normalize_quantity(value: Any, *, minimum: int = 1) -> int:
     try:
         quantity = int(value)
     except (TypeError, ValueError):
         return 1
-    return max(1, min(quantity, 99))
+    return max(minimum, min(quantity, 99))
 
 
 def _normalize_int(value: Any) -> int | None:

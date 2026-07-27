@@ -129,6 +129,28 @@ def test_update_cart_item_sets_quantity() -> None:
     assert payload["cart"]["items"][0]["quantity"] == 4
 
 
+def test_update_cart_item_zero_quantity_removes_item_and_clears_live_cart() -> None:
+    client = FakeCartClient()
+
+    payload = update_cart_item(
+        {
+            "cart": {
+                "token": "existing-token",
+                "items": [{"id": "26078", "name": "Shampoo", "price": 57.27, "quantity": 3}],
+            },
+            "product_id": "26078",
+            "quantity": 0,
+            "language": "ru",
+        },
+        client=client,
+    )
+
+    assert payload["cart"]["items"] == []
+    assert payload["cart"]["count"] == 0
+    assert payload["cart"]["synced"] is True
+    assert client.calls == [("clear_cart", {"token": "existing-token", "language": "ru"})]
+
+
 def test_update_cart_item_reuses_existing_kokiko_cart_token() -> None:
     client = FakeCartClient()
 

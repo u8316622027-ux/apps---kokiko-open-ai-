@@ -168,14 +168,14 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             name="remove_from_cart",
             title="Remove from cart",
             description=(
-                "Remove a product from a cart payload for text-driven cart control, "
-                "sync the remaining numeric product ids to Kokiko cart API, and return "
-                "structuredContent.cart with the current items, count, total, and sync status."
+                "Compatibility cart-session tool. Prefer update_cart_item with quantity 0 "
+                "for user-facing remove actions."
             ),
             input_schema=_cart_mutation_schema(require_product_id=True),
             handler=_remove_from_cart_handler,
             output_template=WIDGET_OUTPUT_TEMPLATE,
             ui=widget_ui_config,
+            visibility="internal",
             annotations={
                 "readOnlyHint": False,
                 "openWorldHint": False,
@@ -213,10 +213,15 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             title="Update cart item",
             description=(
                 "Set product quantity in a cart payload for text-driven cart control, "
+                "remove the product when quantity is 0, "
                 "sync numeric product ids to Kokiko cart API, and return "
                 "structuredContent.cart with the current items, count, total, and sync status."
             ),
-            input_schema=_cart_mutation_schema(require_product_id=True, require_quantity=True),
+            input_schema=_cart_mutation_schema(
+                require_product_id=True,
+                require_quantity=True,
+                quantity_minimum=0,
+            ),
             handler=_update_cart_item_handler,
             output_template=WIDGET_OUTPUT_TEMPLATE,
             ui=widget_ui_config,
@@ -257,7 +262,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             description=(
                 "Internal cart-session tool used by the widget to create/confirm the "
                 "backend Kokiko cart session and push the current cart items to it. "
-                "Not for direct assistant use - use add_to_cart/remove_from_cart/check_cart "
+                "Not for direct assistant use - use add_to_cart/update_cart_item/check_cart "
                 "for user-facing cart actions."
             ),
             input_schema=_cart_mutation_schema(),
@@ -468,6 +473,7 @@ def _cart_mutation_schema(
     require_product: bool = False,
     require_product_id: bool = False,
     require_quantity: bool = False,
+    quantity_minimum: int = 1,
 ) -> dict[str, Any]:
     required: list[str] = []
     if require_product:
@@ -488,7 +494,7 @@ def _cart_mutation_schema(
                 "description": "Product to add: id, name, price, quantity, image_url, product_url.",
             },
             "product_id": {"type": "string"},
-            "quantity": {"type": "integer", "minimum": 1},
+            "quantity": {"type": "integer", "minimum": quantity_minimum},
             "language": {"type": "string"},
         },
         "required": required,
