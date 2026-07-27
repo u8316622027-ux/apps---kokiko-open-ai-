@@ -22,6 +22,7 @@ def test_create_tool_registry_uses_base_handlers() -> None:
 
     for name in (
         "search_products",
+        "search_and_add_to_cart",
         "submit_order",
         "add_to_cart",
         "update_cart_item",
@@ -160,9 +161,48 @@ def test_clear_cart_tool_empties_active_cart_for_next_widget() -> None:
     assert clear_payload["action"] == "clear"
     assert clear_payload["cart"]["count"] == 0
     assert clear_payload["cart"]["items"] == []
-    assert clear_payload["widget"]["open"]["page"] == "cart"
+    assert "widget" not in clear_payload
     assert check_payload["cart"]["count"] == 0
     assert check_payload["cart"]["items"] == []
+
+
+def test_clear_then_add_only_final_cart_widget_opens() -> None:
+    reset_active_cart_for_tests()
+    try:
+        clear_response = mcp_server.handle_rpc_request(
+            {
+                "jsonrpc": "2.0",
+                "id": "1",
+                "method": "tools/call",
+                "params": {"name": "clear_cart", "arguments": {}},
+            }
+        )
+        add_response = mcp_server.handle_rpc_request(
+            {
+                "jsonrpc": "2.0",
+                "id": "2",
+                "method": "tools/call",
+                "params": {
+                    "name": "add_to_cart",
+                    "arguments": {
+                        "product": {
+                            "id": "mask-1",
+                            "name": "Face mask",
+                            "price": 18.75,
+                            "quantity": 5,
+                        },
+                    },
+                },
+            }
+        )
+    finally:
+        reset_active_cart_for_tests()
+
+    clear_payload = clear_response["result"]["structuredContent"]
+    add_payload = add_response["result"]["structuredContent"]
+    assert "widget" not in clear_payload
+    assert add_payload["cart"]["count"] == 5
+    assert add_payload["widget"]["open"]["page"] == "cart"
 
 
 def test_tool_call_can_suppress_widget_for_intermediate_steps() -> None:
@@ -193,6 +233,106 @@ def test_tool_call_can_suppress_widget_for_intermediate_steps() -> None:
     payload = response["result"]["structuredContent"]
     assert payload["cart"]["count"] == 1
     assert "widget" not in payload
+
+
+def test_search_products_tool_does_not_apply_default_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def _fake_search_products(
+        query: str,
+        *,
+        limit: int | None = None,
+        language: str | None = None,
+    ) -> dict[str, object]:
+        captured["query"] = query
+        captured["limit"] = limit
+        captured["language"] = language
+        return {"query": query, "count": 0, "products": [], "language": language or "ru"}
+
+    monkeypatch.setattr(tool_registry, "search_products", _fake_search_products)
+    registry = tool_registry.create_tool_registry()
+
+    response = mcp_server.handle_rpc_request(
+        {
+            "jsonrpc": "2.0",
+            "id": "1",
+            "method": "tools/call",
+            "params": {"name": "search_products", "arguments": {"query": "mask", "limit": 3}},
+        },
+        registry=registry,
+    )
+
+    payload = response["result"]["structuredContent"]
+    assert captured["query"] == "mask"
+    assert captured["limit"] is None
+    assert payload["products"] == []
+
+
+def test_search_and_add_tool_clears_then_adds_with_final_cart_widget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _fake_search_products(
+        query: str,
+        *,
+        limit: int | None = None,
+        language: str | None = None,
+    ) -> dict[str, object]:
+        return {
+            "query": query,
+            "count": 3,
+            "language": language or "ru",
+            "products": [
+                {"id": "mask-1", "name": "Mask 1", "price": 18.75, "image_url": "1.webp"},
+                {"id": "mask-2", "name": "Mask 2", "price": 22.0, "image_url": "2.webp"},
+                {"id": "mask-3", "name": "Mask 3", "price": 19.0, "image_url": "3.webp"},
+            ],
+        }
+
+    monkeypatch.setattr(tool_registry, "search_products", _fake_search_products)
+    reset_active_cart_for_tests()
+    try:
+        mcp_server.handle_rpc_request(
+            {
+                "jsonrpc": "2.0",
+                "id": "1",
+                "method": "tools/call",
+                "params": {
+                    "name": "add_to_cart",
+                    "arguments": {
+                        "product": {
+                            "id": "old-1",
+                            "name": "Old product",
+                            "price": 50,
+                            "quantity": 1,
+                        }
+                    },
+                },
+            }
+        )
+        response = mcp_server.handle_rpc_request(
+            {
+                "jsonrpc": "2.0",
+                "id": "2",
+                "method": "tools/call",
+                "params": {
+                    "name": "search_and_add_to_cart",
+                    "arguments": {"query": "mask", "quantity": 5, "clear_cart": True},
+                },
+            }
+        )
+    finally:
+        reset_active_cart_for_tests()
+
+    payload = response["result"]["structuredContent"]
+    assert payload["action"] == "search_add"
+    assert payload["search_count"] == 3
+    assert len(payload["products"]) == 3
+    assert payload["selected_product"]["id"] == "mask-1"
+    assert payload["cart"]["count"] == 5
+    assert payload["cart"]["items"][0]["id"] == "mask-1"
+    assert payload["widget"]["open"]["page"] == "cart"
 
 
 def test_validate_value_allows_null_for_nullable_object_type() -> None:

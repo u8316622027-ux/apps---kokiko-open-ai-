@@ -26,6 +26,7 @@ from app.interfaces.mcp.tools.search_tools import search_products
 WIDGET_OUTPUT_TEMPLATE = "ui://widget/products.html"
 WIDGET_ACCESSIBLE_TOOL_NAMES = {
     "search_products",
+    "search_and_add_to_cart",
     "submit_order",
     "add_to_cart",
     "clear_cart",
@@ -64,8 +65,10 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             title="Search products",
             description=(
                 "Search products by free-text query via Stage API. "
-                "Args: query and optional limit. "
+                "Args: query. "
+                "Always returns every product returned by Kokiko API without limiting results. "
                 "Returns structuredContent.products and structuredContent.no_results when empty. "
+                "If the user asks to search and add to cart, use search_and_add_to_cart instead. "
                 "For multi-step requests such as search-and-add, search silently with "
                 "open_widget:false and let the final cart or checkout action open the widget."
             ),
@@ -73,7 +76,6 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
                 "type": "object",
                 "properties": {
                     "query": {"type": "string"},
-                    "limit": {"type": "integer", "minimum": 1},
                     "language": {
                         "type": "string",
                         "description": "User language preference (ru or ro).",
@@ -99,6 +101,63 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             tool_invocation={
                 "invoking": "Searching products...",
                 "invoked": "Products found.",
+            },
+        ),
+        "search_and_add_to_cart": ToolDefinition(
+            name="search_and_add_to_cart",
+            title="Search and add to cart",
+            description=(
+                "Use this single tool for user requests that combine product search with "
+                "adding to cart, including requests that first clear the cart. "
+                "It searches all matching Kokiko products without a limit, optionally clears "
+                "the active cart, adds the first priced match or requested product, and opens "
+                "only the final cart widget."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "quantity": {"type": "integer", "minimum": 1},
+                    "clear_cart": {
+                        "type": "boolean",
+                        "description": (
+                            "Set true when the user asks to clear/replace the cart first."
+                        ),
+                    },
+                    "product_id": {
+                        "type": "string",
+                        "description": "Optional exact product id from search results.",
+                    },
+                    "product_index": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Optional 1-based index from search results.",
+                    },
+                    "language": {
+                        "type": "string",
+                        "description": "User language preference (ru or ro).",
+                    },
+                    "open_widget": {
+                        "type": "boolean",
+                        "description": (
+                            "Set false only when another later tool call should open "
+                            "the final widget."
+                        ),
+                    },
+                },
+                "required": ["query"],
+            },
+            handler=_search_and_add_to_cart_handler,
+            output_template=WIDGET_OUTPUT_TEMPLATE,
+            ui=widget_ui_config,
+            annotations={
+                "readOnlyHint": False,
+                "openWorldHint": False,
+                "destructiveHint": False,
+            },
+            tool_invocation={
+                "invoking": "Searching and updating cart...",
+                "invoked": "Cart updated.",
             },
         ),
         "submit_order": ToolDefinition(
@@ -199,7 +258,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             ),
             input_schema=_cart_mutation_schema(),
             handler=_clear_cart_handler,
-            output_template=WIDGET_OUTPUT_TEMPLATE,
+            output_template="",
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": False,
@@ -456,7 +515,7 @@ def decorate_tool_result(
             "open": {
                 "template": tool.output_template,
                 "replace_previous": True,
-                "page": _resolve_widget_page(tool_name),
+                "page": _resolve_widget_page_from_payload(tool_name, payload),
             },
             "ui": tool.ui,
         }
@@ -466,6 +525,8 @@ def decorate_tool_result(
 def _resolve_widget_page(tool_name: str) -> str:
     if tool_name == "search_products":
         return "search"
+    if tool_name == "search_and_add_to_cart":
+        return "cart"
     if tool_name in {
         "add_to_cart",
         "update_cart_item",
@@ -476,6 +537,13 @@ def _resolve_widget_page(tool_name: str) -> str:
     if tool_name == "open_checkout":
         return "checkout"
     return "default"
+
+
+def _resolve_widget_page_from_payload(tool_name: str, payload: dict[str, Any]) -> str:
+    page = str(payload.get("widget_page") or "").strip()
+    if page in {"search", "cart", "checkout", "default"}:
+        return page
+    return _resolve_widget_page(tool_name)
 
 
 def _cart_mutation_schema(
@@ -554,12 +622,58 @@ def _build_widget_ui_config() -> dict[str, Any]:
 
 def _search_products_handler(arguments: dict[str, Any]) -> dict[str, Any]:
     query = str(arguments.get("query", ""))
-    limit = int(arguments.get("limit", 10))
     language = arguments.get("language")
     return _apply_open_widget_preference(
-        search_products(query, limit=limit, language=language),
+        search_products(query, limit=None, language=language),
         arguments,
     )
+
+
+def _search_and_add_to_cart_handler(arguments: dict[str, Any]) -> dict[str, Any]:
+    query = str(arguments.get("query", ""))
+    language = arguments.get("language")
+    search_payload = search_products(query, limit=None, language=language)
+    products = _extract_products(search_payload)
+    quantity = _normalize_tool_quantity(arguments.get("quantity"))
+
+    if arguments.get("clear_cart") is True:
+        clear_cart({"language": language, "open_widget": False})
+
+    selected_product = _select_search_product(products, arguments)
+    cart_product = _product_to_cart_product(selected_product, quantity=quantity)
+    if cart_product is None:
+        cart_payload = check_cart({"language": language})
+        payload = {
+            **cart_payload,
+            "status": "not_added",
+            "action": "search_add",
+            "query": str(search_payload.get("query") or query).strip(),
+            "products": products,
+            "search_count": len(products),
+            "selected_product": selected_product,
+            "added_quantity": 0,
+            "widget_page": "search",
+        }
+        return _apply_open_widget_preference(payload, arguments)
+
+    add_payload = add_to_cart(
+        {
+            "product": cart_product,
+            "language": language,
+            "open_widget": False,
+        }
+    )
+    payload = {
+        **add_payload,
+        "action": "search_add",
+        "query": str(search_payload.get("query") or query).strip(),
+        "products": products,
+        "search_count": len(products),
+        "selected_product": selected_product,
+        "added_quantity": quantity,
+        "widget_page": "cart",
+    }
+    return _apply_open_widget_preference(payload, arguments)
 
 
 def _submit_order_handler(arguments: dict[str, Any]) -> dict[str, Any]:
@@ -598,6 +712,83 @@ def _set_widget_language_handler(arguments: dict[str, Any]) -> dict[str, Any]:
 
 def _open_checkout_handler(arguments: dict[str, Any]) -> dict[str, Any]:
     return _apply_open_widget_preference(open_checkout(arguments), arguments)
+
+
+def _extract_products(search_payload: dict[str, Any]) -> list[dict[str, Any]]:
+    products = search_payload.get("products")
+    if not isinstance(products, list):
+        return []
+    return [dict(product) for product in products if isinstance(product, dict)]
+
+
+def _select_search_product(
+    products: list[dict[str, Any]],
+    arguments: dict[str, Any],
+) -> dict[str, Any] | None:
+    product_id = str(arguments.get("product_id") or "").strip()
+    if product_id:
+        for product in products:
+            if str(product.get("id") or product.get("product_id") or "").strip() == product_id:
+                return product if _product_effective_price(product) is not None else None
+        return None
+
+    try:
+        product_index = int(arguments.get("product_index"))
+    except (TypeError, ValueError):
+        product_index = 0
+    if product_index > 0:
+        selected = products[product_index - 1] if product_index <= len(products) else None
+        return selected if selected and _product_effective_price(selected) is not None else None
+
+    for product in products:
+        if _product_effective_price(product) is not None:
+            return product
+    return None
+
+
+def _product_to_cart_product(
+    product: dict[str, Any] | None,
+    *,
+    quantity: int,
+) -> dict[str, Any] | None:
+    if product is None:
+        return None
+    product_id = str(product.get("id") or product.get("product_id") or "").strip()
+    name = str(
+        product.get("name") or product.get("name_ru") or product.get("name_ro") or ""
+    ).strip()
+    price = _product_effective_price(product)
+    if not product_id or not name or price is None:
+        return None
+    return {
+        "id": product_id,
+        "name": name,
+        "manufacturer": str(product.get("manufacturer") or "").strip(),
+        "price": price,
+        "quantity": quantity,
+        "image_url": str(product.get("image_url") or product.get("imageUrl") or "").strip(),
+        "product_url": str(product.get("product_url") or product.get("productUrl") or "").strip(),
+    }
+
+
+def _product_effective_price(product: dict[str, Any]) -> float | None:
+    for key in ("discount_price", "discountPrice", "price"):
+        value = product.get(key)
+        try:
+            price = float(value)
+        except (TypeError, ValueError):
+            continue
+        if price > 0:
+            return round(price, 2)
+    return None
+
+
+def _normalize_tool_quantity(value: Any) -> int:
+    try:
+        quantity = int(value)
+    except (TypeError, ValueError):
+        return 1
+    return max(1, min(quantity, 99))
 
 
 def _apply_open_widget_preference(

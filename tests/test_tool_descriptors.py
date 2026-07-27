@@ -62,18 +62,26 @@ def test_submit_order_tool_descriptor_allows_checkout_submission() -> None:
 def test_cart_tools_are_registered_for_text_control() -> None:
     registry = tool_registry.create_tool_registry()
 
-    for name in ("add_to_cart", "update_cart_item", "check_cart", "clear_cart"):
+    for name in ("add_to_cart", "update_cart_item", "check_cart", "search_and_add_to_cart"):
         payload = tool_registry.serialize_tool_definition(registry[name])
         assert payload["outputTemplate"] == WIDGET_TEMPLATE_URI
         assert payload["_meta"]["openai/outputTemplate"] == WIDGET_TEMPLATE_URI
         assert payload["annotations"]["destructiveHint"] is False
 
+    clear_payload = tool_registry.serialize_tool_definition(registry["clear_cart"])
+    assert "outputTemplate" not in clear_payload
+    assert "openai/outputTemplate" not in clear_payload["_meta"]
+    assert clear_payload["annotations"]["destructiveHint"] is False
+
     assert registry["check_cart"].annotations["readOnlyHint"] is True
     assert registry["add_to_cart"].annotations["readOnlyHint"] is False
+    assert registry["search_and_add_to_cart"].annotations["readOnlyHint"] is False
     assert (
         registry["search_products"].input_schema["properties"]["open_widget"]["type"] == "boolean"
     )
     assert registry["add_to_cart"].input_schema["properties"]["open_widget"]["type"] == "boolean"
+    assert "limit" not in registry["search_products"].input_schema["properties"]
+    assert registry["search_and_add_to_cart"].input_schema["properties"]["quantity"]["minimum"] == 1
     assert "remove_from_cart" not in registry
     assert registry["update_cart_item"].input_schema["properties"]["quantity"]["minimum"] == 0
     for name in (
@@ -91,6 +99,7 @@ def test_widget_callable_tools_are_marked_widget_accessible() -> None:
 
     for name in (
         "search_products",
+        "search_and_add_to_cart",
         "add_to_cart",
         "update_cart_item",
         "clear_cart",
