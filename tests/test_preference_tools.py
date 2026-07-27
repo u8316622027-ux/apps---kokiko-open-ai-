@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import pytest
 
+from app.interfaces.mcp.tools.cart_tools import add_to_cart, reset_active_cart_for_tests
 from app.interfaces.mcp.tools.preference_tools import (
     open_checkout,
     set_widget_language,
     set_widget_theme,
 )
+
+
+def setup_function() -> None:
+    reset_active_cart_for_tests()
 
 
 def test_set_widget_theme_returns_widget_payload() -> None:
@@ -70,5 +75,24 @@ def test_open_checkout_returns_checkout_widget_page() -> None:
 
     assert payload["status"] == "ok"
     assert payload["widget_page"] == "checkout"
-    assert payload["cart"]["token"] == "cart-123"
+    assert "token" not in payload["cart"]
     assert payload["cart"]["items"][0]["quantity"] == 2
+
+
+def test_open_checkout_uses_active_cart_when_cart_omitted() -> None:
+    add_to_cart(
+        {
+            "product": {
+                "id": "cream-1",
+                "name": "Face cream",
+                "price": 99,
+                "quantity": 2,
+            }
+        }
+    )
+
+    payload = open_checkout({"language": "ru"})
+
+    assert payload["cart"]["items"][0]["id"] == "cream-1"
+    assert payload["cart"]["items"][0]["quantity"] == 2
+    assert "token" not in payload["cart"]

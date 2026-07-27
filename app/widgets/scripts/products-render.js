@@ -497,7 +497,6 @@
     });
 
     const getCartPayload = () => ({
-      token: state.cartToken,
       items: state.cartItems.map(normalizeCartToolItem),
     });
 
@@ -510,10 +509,6 @@
         {};
       const cart =
         payload.cart && typeof payload.cart === "object" ? payload.cart : {};
-      if (normalizeText(cart.token)) {
-        state.cartToken = normalizeText(cart.token);
-        writeStoredCartToken(state.cartToken);
-      }
       if (!Array.isArray(cart.items)) {
         return cart;
       }
@@ -596,7 +591,11 @@
       if (mutationSerial !== state.cartMutationSerial) {
         return;
       }
-      if (!result || result.synced !== true) {
+      if (
+        !result ||
+        (result.synced !== true &&
+          (!Array.isArray(result.items) || !result.items.length))
+      ) {
         state.cartItems = [];
         persistAndRenderCart();
       }
@@ -2015,7 +2014,6 @@
     };
 
     const buildOrderPayload = () => ({
-      cart_token: state.cartToken,
       customer_name: getCheckoutValue(checkoutName),
       customer_phone: getFullCheckoutPhone(),
       customer_phone_country: getSelectedPhoneCountry().code,

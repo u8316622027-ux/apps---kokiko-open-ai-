@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.interfaces.mcp.tools.cart_tools import get_active_cart_payload
+
 SUPPORTED_LANGUAGES = ["ru", "ro"]
 SUPPORTED_THEMES = ["light", "dark", "auto"]
 
@@ -54,6 +56,8 @@ def open_checkout(arguments: dict[str, Any]) -> dict[str, Any]:
     language = _normalize_language(arguments.get("language")) or "ru"
     theme = _normalize_theme(arguments.get("theme"))
     cart = _normalize_cart_payload(arguments.get("cart") or arguments)
+    if not cart["items"]:
+        cart = get_active_cart_payload()["cart"]
 
     payload: dict[str, Any] = {
         "status": "ok",
@@ -93,17 +97,7 @@ def _normalize_cart_payload(raw_cart: Any) -> dict[str, Any]:
     cart = raw_cart if isinstance(raw_cart, dict) else {}
     raw_items = cart.get("items") if isinstance(cart.get("items"), list) else []
     items = [_normalize_cart_item(item) for item in raw_items]
-    return {
-        "token": str(
-            cart.get("token")
-            or cart.get("cart_token")
-            or cart.get("cartToken")
-            or cart.get("access_token")
-            or cart.get("accessToken")
-            or ""
-        ).strip(),
-        "items": [item for item in items if item],
-    }
+    return {"items": [item for item in items if item]}
 
 
 def _normalize_cart_item(raw_item: Any) -> dict[str, Any] | None:

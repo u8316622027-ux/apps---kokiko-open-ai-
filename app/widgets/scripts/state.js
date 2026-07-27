@@ -656,11 +656,8 @@
       );
 
     state.cartItems = readStoredCart();
-    state.cartToken = readStoredCartToken();
-    if (!state.cartToken) {
-      state.cartItems = [];
-      writeStoredCart();
-    }
+    state.cartToken = "";
+    writeStoredCartToken("");
 
     return {
       root,

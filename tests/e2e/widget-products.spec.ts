@@ -157,8 +157,8 @@ test("products widget syncs cart actions through cart tools", async ({
     "remove_from_cart",
   ]);
   expect(calls[0].args.product.id).toBe("cream-1");
-  expect(calls[1].args.cart.token).toBe("cart-token-123");
-  expect(calls[2].args.cart.token).toBe("cart-token-123");
+  expect(calls[1].args.cart.token).toBeUndefined();
+  expect(calls[2].args.cart.token).toBeUndefined();
 });
 
 test("products widget ignores stale cart add confirmations", async ({
@@ -273,7 +273,9 @@ test("products widget does not resurrect removed items from stale add response",
   );
 });
 
-test("products widget bootstraps a cart token on mount", async ({ page }) => {
+test("products widget hydrates server cart on mount without persisting token", async ({
+  page,
+}) => {
   await page.addInitScript(() => {
     window.__KOKIKO_SYNC_CALLS__ = [];
     window.openai = {
@@ -281,7 +283,18 @@ test("products widget bootstraps a cart token on mount", async ({ page }) => {
         window.__KOKIKO_SYNC_CALLS__.push({ name, args });
         return {
           structuredContent: {
-            cart: { token: "bootstrap-token-1", synced: true, items: [] },
+            cart: {
+              token: "bootstrap-token-1",
+              synced: true,
+              items: [
+                {
+                  id: "26078",
+                  name: "Shampoo",
+                  price: 57.27,
+                  quantity: 2,
+                },
+              ],
+            },
           },
         };
       },
@@ -299,10 +312,11 @@ test("products widget bootstraps a cart token on mount", async ({ page }) => {
   const storedToken = await page.evaluate(() =>
     window.localStorage.getItem("kokiko_widget_cart_token"),
   );
-  expect(storedToken).toBe("bootstrap-token-1");
+  expect(storedToken).toBeNull();
+  await expect(page.locator("#products-cart-count")).toContainText("2");
 });
 
-test("products widget clears stale local cart items when no token is persisted", async ({
+test("products widget keeps local cart items without a persisted token", async ({
   page,
 }) => {
   const htmlPath = path.resolve(process.cwd(), "app/widgets/products.html");
@@ -321,11 +335,11 @@ test("products widget clears stale local cart items when no token is persisted",
   await page.goto(htmlUrl, { waitUntil: "domcontentloaded" });
 
   const cartCount = await page.locator("#products-cart-count").textContent();
-  expect(cartCount).toBe("0");
+  expect(cartCount).toBe("2");
   const storedCart = await page.evaluate(() =>
     window.localStorage.getItem("kokiko_widget_cart"),
   );
-  expect(JSON.parse(storedCart || "[]")).toEqual([]);
+  expect(JSON.parse(storedCart || "[]")).toHaveLength(1);
 });
 
 test("products widget keeps a persisted cart when the mount sync confirms it", async ({
@@ -336,7 +350,6 @@ test("products widget keeps a persisted cart when the mount sync confirms it", a
 
   await page.addInitScript(() => {
     window.localStorage.clear();
-    window.localStorage.setItem("kokiko_widget_cart_token", "existing-token");
     window.localStorage.setItem(
       "kokiko_widget_cart",
       JSON.stringify([
@@ -352,7 +365,6 @@ test("products widget keeps a persisted cart when the mount sync confirms it", a
       callTool: async (name, args) => ({
         structuredContent: {
           cart: {
-            token: "existing-token",
             synced: true,
             items: Array.isArray(args?.cart?.items) ? args.cart.items : [],
           },
@@ -366,7 +378,7 @@ test("products widget keeps a persisted cart when the mount sync confirms it", a
   await expect(page.locator("#products-cart-count")).toContainText("1");
 });
 
-test("products widget clears a persisted cart when the mount sync reports it unsynced", async ({
+test("products widget clears a persisted cart when sync returns no items", async ({
   page,
 }) => {
   const htmlPath = path.resolve(process.cwd(), "app/widgets/products.html");
@@ -374,7 +386,6 @@ test("products widget clears a persisted cart when the mount sync reports it uns
 
   await page.addInitScript(() => {
     window.localStorage.clear();
-    window.localStorage.setItem("kokiko_widget_cart_token", "existing-token");
     window.localStorage.setItem(
       "kokiko_widget_cart",
       JSON.stringify([
@@ -390,9 +401,8 @@ test("products widget clears a persisted cart when the mount sync reports it uns
       callTool: async (name, args) => ({
         structuredContent: {
           cart: {
-            token: "existing-token",
             synced: false,
-            items: Array.isArray(args?.cart?.items) ? args.cart.items : [],
+            items: [],
           },
         },
       }),

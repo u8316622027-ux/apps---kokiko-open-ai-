@@ -13,6 +13,7 @@ import pytest
 
 from app.interfaces.mcp import server as mcp_server
 from app.interfaces.mcp import tool_registry
+from app.interfaces.mcp.tools.cart_tools import reset_active_cart_for_tests
 
 
 def test_create_tool_registry_uses_base_handlers() -> None:
@@ -70,6 +71,48 @@ def test_build_tool_success_text_round_trips_payload() -> None:
     encoded = mcp_server._build_tool_success_text(payload)
 
     assert json.loads(encoded) == payload
+
+
+def test_cart_tool_calls_share_active_cart_without_exposing_token() -> None:
+    reset_active_cart_for_tests()
+    try:
+        add_response = mcp_server.handle_rpc_request(
+            {
+                "jsonrpc": "2.0",
+                "id": "1",
+                "method": "tools/call",
+                "params": {
+                    "name": "add_to_cart",
+                    "arguments": {
+                        "product": {
+                            "id": "cream-1",
+                            "name": "Face cream",
+                            "price": 99,
+                            "quantity": 2,
+                        }
+                    },
+                },
+            }
+        )
+        check_response = mcp_server.handle_rpc_request(
+            {
+                "jsonrpc": "2.0",
+                "id": "2",
+                "method": "tools/call",
+                "params": {"name": "check_cart", "arguments": {}},
+            }
+        )
+    finally:
+        reset_active_cart_for_tests()
+
+    add_payload = add_response["result"]["structuredContent"]
+    check_payload = check_response["result"]["structuredContent"]
+    assert add_payload["cart"]["count"] == 2
+    assert check_payload["cart"]["count"] == 2
+    assert check_payload["cart"]["items"][0]["id"] == "cream-1"
+    serialized = json.dumps([add_payload, check_payload])
+    assert "token" not in serialized.lower()
+    assert "access_token" not in serialized.lower()
 
 
 def test_validate_value_allows_null_for_nullable_object_type() -> None:

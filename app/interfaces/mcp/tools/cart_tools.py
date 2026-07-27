@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+import threading
 from typing import Any, Protocol
 
 from app.interfaces.mcp.tools.order_tools import (
     KOKIKO_DEFAULT_LANGUAGE,
     KokikoOrderClient,
 )
+
+_ACTIVE_CART_LOCK = threading.Lock()
+_ACTIVE_CART: dict[str, Any] = {
+    "items": [],
+    "token": "",
+    "synced": False,
+}
 
 
 class KokikoCartClientProtocol(Protocol):
@@ -27,10 +35,7 @@ def add_to_cart(
 ) -> dict[str, Any]:
     """Add a product to a cart payload and return the updated cart."""
 
-    cart_items = _normalize_cart(arguments.get("cart"))
-    cart_token = _extract_cart_token(arguments.get("cart")) or _normalize_text(
-        arguments.get("cart_token")
-    )
+    cart_items, cart_token = _resolve_cart(arguments)
     raw_product = arguments.get("product") or arguments
     product = _normalize_product(raw_product)
     if product is None:
@@ -56,11 +61,11 @@ def add_to_cart(
         language=_normalize_language(arguments.get("language")),
         client=client,
     )
+    _write_active_cart(cart_items, token=sync["token"], synced=sync["synced"])
     return _build_cart_response(
         cart_items,
         status="updated",
         action="add",
-        cart_token=sync["token"],
         synced=sync["synced"],
     )
 
@@ -75,23 +80,19 @@ def remove_from_cart(
     product_id = _normalize_text(arguments.get("product_id") or arguments.get("id"))
     if not product_id:
         raise ValueError("product_id is required")
-    cart_token = _extract_cart_token(arguments.get("cart")) or _normalize_text(
-        arguments.get("cart_token")
-    )
-    cart_items = [
-        item for item in _normalize_cart(arguments.get("cart")) if item["id"] != product_id
-    ]
+    current_items, cart_token = _resolve_cart(arguments)
+    cart_items = [item for item in current_items if item["id"] != product_id]
     sync = _sync_live_cart(
         cart_items,
         cart_token=cart_token,
         language=_normalize_language(arguments.get("language")),
         client=client,
     )
+    _write_active_cart(cart_items, token=sync["token"], synced=sync["synced"])
     return _build_cart_response(
         cart_items,
         status="updated",
         action="remove",
-        cart_token=sync["token"],
         synced=sync["synced"],
     )
 
@@ -106,11 +107,8 @@ def update_cart_item(
     product_id = _normalize_text(arguments.get("product_id") or arguments.get("id"))
     if not product_id:
         raise ValueError("product_id is required")
-    cart_token = _extract_cart_token(arguments.get("cart")) or _normalize_text(
-        arguments.get("cart_token")
-    )
     quantity = _normalize_quantity(arguments.get("quantity"))
-    cart_items = _normalize_cart(arguments.get("cart"))
+    cart_items, cart_token = _resolve_cart(arguments)
     for item in cart_items:
         if item["id"] == product_id:
             item["quantity"] = quantity
@@ -121,11 +119,11 @@ def update_cart_item(
         language=_normalize_language(arguments.get("language")),
         client=client,
     )
+    _write_active_cart(cart_items, token=sync["token"], synced=sync["synced"])
     return _build_cart_response(
         cart_items,
         status="updated",
         action="update",
-        cart_token=sync["token"],
         synced=sync["synced"],
     )
 
@@ -133,7 +131,14 @@ def update_cart_item(
 def check_cart(arguments: dict[str, Any]) -> dict[str, Any]:
     """Return a normalized cart summary."""
 
-    return _build_cart_response(_normalize_cart(arguments.get("cart")), status="ok", action="check")
+    cart_items, _cart_token = _resolve_cart(arguments)
+    active_cart = _read_active_cart()
+    return _build_cart_response(
+        cart_items,
+        status="ok",
+        action="check",
+        synced=bool(active_cart["synced"]),
+    )
 
 
 def sync_cart(
@@ -143,10 +148,7 @@ def sync_cart(
 ) -> dict[str, Any]:
     """Ensure a backend cart token exists and push the current cart to it."""
 
-    cart_items = _normalize_cart(arguments.get("cart"))
-    cart_token = _extract_cart_token(arguments.get("cart")) or _normalize_text(
-        arguments.get("cart_token")
-    )
+    cart_items, cart_token = _resolve_cart(arguments)
     sync = _sync_live_cart(
         cart_items,
         cart_token=cart_token,
@@ -154,13 +156,35 @@ def sync_cart(
         client=client,
         always_create_token=True,
     )
+    _write_active_cart(cart_items, token=sync["token"], synced=sync["synced"])
     return _build_cart_response(
         cart_items,
         status="ok",
         action="sync",
-        cart_token=sync["token"],
         synced=sync["synced"],
     )
+
+
+def get_active_cart_payload() -> dict[str, Any]:
+    """Return the current process-wide cart snapshot without the live token."""
+
+    active_cart = _read_active_cart()
+    return _build_cart_response(
+        active_cart["items"],
+        status="ok",
+        action="check",
+        synced=bool(active_cart["synced"]),
+    )
+
+
+def clear_active_cart() -> None:
+    """Clear the process-wide cart snapshot after a successful checkout."""
+
+    _write_active_cart([], token="", synced=False)
+
+
+def reset_active_cart_for_tests() -> None:
+    clear_active_cart()
 
 
 def _build_cart_response(
@@ -168,7 +192,6 @@ def _build_cart_response(
     *,
     status: str,
     action: str,
-    cart_token: str = "",
     synced: bool = False,
 ) -> dict[str, Any]:
     count = sum(int(item["quantity"]) for item in items)
@@ -180,11 +203,51 @@ def _build_cart_response(
             "items": items,
             "count": count,
             "total": total,
-            "token": cart_token,
             "synced": synced,
         },
         "widget_page": "cart",
     }
+
+
+def _resolve_cart(arguments: dict[str, Any]) -> tuple[list[dict[str, Any]], str]:
+    active_cart = _read_active_cart()
+    cart_items = _normalize_cart(arguments.get("cart"))
+    if not cart_items:
+        cart_items = _normalize_cart(arguments)
+    if not cart_items:
+        cart_items = active_cart["items"]
+
+    cart_token = (
+        _extract_cart_token(arguments.get("cart"))
+        or _normalize_text(arguments.get("cart_token"))
+        or active_cart["token"]
+    )
+    return _clone_cart_items(cart_items), cart_token
+
+
+def _read_active_cart() -> dict[str, Any]:
+    with _ACTIVE_CART_LOCK:
+        return {
+            "items": _clone_cart_items(_ACTIVE_CART["items"]),
+            "token": str(_ACTIVE_CART["token"]),
+            "synced": bool(_ACTIVE_CART["synced"]),
+        }
+
+
+def _write_active_cart(
+    items: list[dict[str, Any]],
+    *,
+    token: str,
+    synced: bool,
+) -> None:
+    with _ACTIVE_CART_LOCK:
+        _ACTIVE_CART["items"] = _clone_cart_items(items)
+        _ACTIVE_CART["token"] = _normalize_text(token)
+        _ACTIVE_CART["synced"] = bool(synced)
+
+
+def _clone_cart_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [dict(item) for item in items]
 
 
 def _normalize_cart(raw_cart: Any) -> list[dict[str, Any]]:

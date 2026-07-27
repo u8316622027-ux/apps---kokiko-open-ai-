@@ -10,6 +10,7 @@ from app.interfaces.mcp.tools.apteka_urls import get_apteka_base_url
 from app.interfaces.mcp.tools.cart_tools import (
     add_to_cart,
     check_cart,
+    clear_active_cart,
     remove_from_cart,
     sync_cart,
     update_cart_item,
@@ -92,7 +93,6 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
                 "properties": {
                     "customer_name": {"type": "string"},
                     "customer_phone": {"type": "string"},
-                    "cart_token": {"type": "string"},
                     "email": {"type": "string"},
                     "delivery_method": {
                         "type": "string",
@@ -147,7 +147,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             description=(
                 "Add a product to a cart payload for text-driven cart control, "
                 "sync numeric product ids to Kokiko cart API, and return "
-                "structuredContent.cart with token/synced metadata."
+                "structuredContent.cart with the current items, count, total, and sync status."
             ),
             input_schema=_cart_mutation_schema(require_product=True),
             handler=_add_to_cart_handler,
@@ -169,7 +169,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             description=(
                 "Remove a product from a cart payload for text-driven cart control, "
                 "sync the remaining numeric product ids to Kokiko cart API, and return "
-                "structuredContent.cart with token/synced metadata."
+                "structuredContent.cart with the current items, count, total, and sync status."
             ),
             input_schema=_cart_mutation_schema(require_product_id=True),
             handler=_remove_from_cart_handler,
@@ -191,7 +191,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             description=(
                 "Set product quantity in a cart payload for text-driven cart control, "
                 "sync numeric product ids to Kokiko cart API, and return "
-                "structuredContent.cart with token/synced metadata."
+                "structuredContent.cart with the current items, count, total, and sync status."
             ),
             input_schema=_cart_mutation_schema(require_product_id=True, require_quantity=True),
             handler=_update_cart_item_handler,
@@ -233,7 +233,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             title="Sync cart",
             description=(
                 "Internal cart-session tool used by the widget to create/confirm the "
-                "backend Kokiko cart token and push the current cart items to it. "
+                "backend Kokiko cart session and push the current cart items to it. "
                 "Not for direct assistant use - use add_to_cart/remove_from_cart/check_cart "
                 "for user-facing cart actions."
             ),
@@ -328,7 +328,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
                 "properties": {
                     "cart": {
                         "type": "object",
-                        "description": "Current cart payload with token and items.",
+                        "description": "Current cart payload with items.",
                     },
                     "language": {
                         "type": "string",
@@ -460,7 +460,6 @@ def _cart_mutation_schema(
             },
             "product_id": {"type": "string"},
             "quantity": {"type": "integer", "minimum": 1},
-            "cart_token": {"type": "string"},
             "language": {"type": "string"},
         },
         "required": required,
@@ -507,7 +506,9 @@ def _search_products_handler(arguments: dict[str, Any]) -> dict[str, Any]:
 
 
 def _submit_order_handler(arguments: dict[str, Any]) -> dict[str, Any]:
-    return submit_order(arguments)
+    payload = submit_order(arguments)
+    clear_active_cart()
+    return payload
 
 
 def _add_to_cart_handler(arguments: dict[str, Any]) -> dict[str, Any]:

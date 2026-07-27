@@ -56,6 +56,7 @@ def test_submit_order_tool_descriptor_allows_checkout_submission() -> None:
     assert payload["inputSchema"]["properties"]["pharmacy_id"]["type"] == "integer"
     assert payload["inputSchema"]["properties"]["region_id"]["type"] == "integer"
     assert payload["inputSchema"]["properties"]["sector_id"]["type"] == "integer"
+    assert "cart_token" not in payload["inputSchema"]["properties"]
 
 
 def test_cart_tools_are_registered_for_text_control() -> None:
@@ -69,6 +70,8 @@ def test_cart_tools_are_registered_for_text_control() -> None:
 
     assert registry["check_cart"].annotations["readOnlyHint"] is True
     assert registry["add_to_cart"].annotations["readOnlyHint"] is False
+    for name in ("add_to_cart", "remove_from_cart", "update_cart_item", "check_cart", "sync_cart"):
+        assert "cart_token" not in registry[name].input_schema["properties"]
 
 
 def test_sync_cart_tool_is_registered_for_widget_bootstrap() -> None:
