@@ -76,6 +76,35 @@ test("products widget supports cart quantity changes", async ({ page }) => {
   );
 });
 
+test("products widget shows pass-through cart toast when an item is added", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 768, height: 720 });
+  await openWidgetWithProduct(page);
+
+  const addButton = page.locator('[data-action="add-to-cart"]');
+  await addButton.click();
+  await addButton.click();
+
+  const toastRegion = page.locator("#products-cart-toast-region");
+  const toasts = page.locator(".products-cart-toast");
+  await expect(toastRegion).toBeVisible();
+  await expect(toasts).toHaveCount(2);
+  await expect(toasts.first()).toContainText(
+    /Добавлен в корзину|Р”РѕР±Р°РІР»РµРЅ РІ РєРѕСЂР·РёРЅСѓ|AdДѓugat/,
+  );
+
+  const passThrough = await toasts.first().evaluate((toast) => {
+    const box = toast.getBoundingClientRect();
+    const elementAtToast = document.elementFromPoint(
+      box.left + box.width / 2,
+      box.top + box.height / 2,
+    );
+    return !elementAtToast || !toast.contains(elementAtToast);
+  });
+  expect(passThrough).toBe(true);
+});
+
 test("products cart opens as a centered modal", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openWidgetWithProduct(page);

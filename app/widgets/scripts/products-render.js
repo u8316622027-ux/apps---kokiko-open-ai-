@@ -16,6 +16,7 @@
       cartItems,
       cartTotal,
       cartCheckout,
+      cartToastRegion,
       checkoutForm,
       checkoutName,
       checkoutCountry,
@@ -102,6 +103,7 @@
           back: "Înapoi",
           building: "Nr. casă*",
           cartClose: "Închide coșul",
+          cartToastAdded: "Adăugat în coș",
           checkout: "Finalizare comandă",
           checkoutTitle: "Finalizarea comenzii",
           comment: "Comentariu",
@@ -174,6 +176,7 @@
         back: "Назад",
         building: "№ дома*",
         cartClose: "Закрыть корзину",
+        cartToastAdded: "Добавлен в корзину",
         checkout: "Оформить заказ",
         checkoutTitle: "Оформление заказа",
         comment: "Комментарий",
@@ -246,6 +249,45 @@
       const maxScroll = Math.max(0, track.scrollWidth - track.clientWidth);
       leftArrow.disabled = !canScroll || track.scrollLeft <= 2;
       rightArrow.disabled = !canScroll || track.scrollLeft >= maxScroll - 2;
+    };
+
+    const renderCartToasts = () => {
+      if (!(cartToastRegion instanceof HTMLElement)) {
+        return;
+      }
+      const toasts = Array.isArray(state.cartToasts) ? state.cartToasts : [];
+      cartToastRegion.hidden = toasts.length < 1;
+      cartToastRegion.innerHTML = toasts
+        .map(
+          (toast) => `
+            <div class="products-cart-toast" role="status" data-toast-id="${escapeHtml(String(toast.id))}">
+              <span>${escapeHtml(toast.message)}</span>
+              <span class="products-cart-toast-close" aria-hidden="true">×</span>
+            </div>
+          `,
+        )
+        .join("");
+    };
+
+    const dismissCartToast = (toastId) => {
+      state.cartToasts = (
+        Array.isArray(state.cartToasts) ? state.cartToasts : []
+      ).filter((toast) => toast.id !== toastId);
+      renderCartToasts();
+    };
+
+    const showCartToast = () => {
+      state.cartToastSerial = Number(state.cartToastSerial || 0) + 1;
+      const toast = {
+        id: `cart-toast-${state.cartToastSerial}`,
+        message: getUiCopy().cartToastAdded,
+      };
+      state.cartToasts = [
+        ...(Array.isArray(state.cartToasts) ? state.cartToasts : []),
+        toast,
+      ].slice(-3);
+      renderCartToasts();
+      window.setTimeout(() => dismissCartToast(toast.id), 2600);
     };
 
     const findCartItem = (productId) =>
@@ -2199,6 +2241,7 @@
       state.orderSubmitted = false;
       debugLog("cart_add", { productId: product.id });
       persistAndRenderCart();
+      showCartToast();
       const mutationSerial = nextCartMutationSerial();
       void callCartTool(
         "add_to_cart",

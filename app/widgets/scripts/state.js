@@ -13,6 +13,8 @@
       isLoading: true,
       products: [],
       cartItems: [],
+      cartToasts: [],
+      cartToastSerial: 0,
       cartMutationSerial: 0,
       cartOpen: false,
       checkoutOpen: false,
@@ -56,6 +58,9 @@
     const cartItems = document.getElementById("products-cart-items");
     const cartTotal = document.getElementById("products-cart-total");
     const cartCheckout = document.getElementById("products-cart-checkout");
+    const cartToastRegion = document.getElementById(
+      "products-cart-toast-region",
+    );
     const checkoutForm = document.getElementById("products-checkout-flow");
     const checkoutName = document.getElementById("products-checkout-flow-name");
     const checkoutCountry = document.getElementById(
@@ -688,6 +693,7 @@
         cartItems,
         cartTotal,
         cartCheckout,
+        cartToastRegion,
         checkoutForm,
         checkoutName,
         checkoutCountry,
