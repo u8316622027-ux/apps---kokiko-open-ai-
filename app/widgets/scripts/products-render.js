@@ -2292,10 +2292,11 @@
       persistAndRenderCart();
       const mutationSerial = nextCartMutationSerial();
       void callCartTool(
-        "remove_from_cart",
+        "update_cart_item",
         {
           cart: getCartPayload(),
           product_id: normalizedProductId,
+          quantity: 0,
           language: getActiveLanguage(),
         },
         mutationSerial,

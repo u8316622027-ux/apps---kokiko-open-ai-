@@ -140,7 +140,7 @@ test("products widget syncs cart actions through cart tools", async ({
         const nextItems =
           name === "add_to_cart" && product
             ? items.concat(product)
-            : name === "remove_from_cart"
+            : name === "update_cart_item" && args.quantity === 0
               ? items.filter((item) => item.id !== args.product_id)
               : items.map((item) =>
                   item.id === args.product_id
@@ -183,11 +183,12 @@ test("products widget syncs cart actions through cart tools", async ({
   expect(calls.map((call) => call.name)).toEqual([
     "add_to_cart",
     "update_cart_item",
-    "remove_from_cart",
+    "update_cart_item",
   ]);
   expect(calls[0].args.product.id).toBe("cream-1");
   expect(calls[1].args.cart.token).toBeUndefined();
   expect(calls[2].args.cart.token).toBeUndefined();
+  expect(calls[2].args.quantity).toBe(0);
 });
 
 test("products widget ignores stale cart add confirmations", async ({
@@ -209,6 +210,7 @@ test("products widget ignores stale cart add confirmations", async ({
             name === "add_to_cart" && product ? items.concat(product) : items;
           window.__KOKIKO_CART_RESOLVERS__.push({
             name,
+            args,
             resolve: () =>
               resolve({
                 structuredContent: {
@@ -258,11 +260,12 @@ test("products widget does not resurrect removed items from stale add response",
           const nextItems =
             name === "add_to_cart" && product
               ? items.concat(product)
-              : name === "remove_from_cart"
+              : name === "update_cart_item" && args.quantity === 0
                 ? items.filter((item) => item.id !== args.product_id)
                 : items;
           window.__KOKIKO_CART_RESOLVERS__.push({
             name,
+            args,
             resolve: () =>
               resolve({
                 structuredContent: {
@@ -286,7 +289,10 @@ test("products widget does not resurrect removed items from stale add response",
 
   await page.evaluate(() =>
     window.__KOKIKO_CART_RESOLVERS__
-      .find((resolver) => resolver.name === "remove_from_cart")
+      .find(
+        (resolver) =>
+          resolver.name === "update_cart_item" && resolver.args?.quantity === 0,
+      )
       .resolve(),
   );
   await page.evaluate(() =>

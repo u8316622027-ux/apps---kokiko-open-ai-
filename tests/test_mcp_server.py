@@ -24,7 +24,6 @@ def test_create_tool_registry_uses_base_handlers() -> None:
         "search_products",
         "submit_order",
         "add_to_cart",
-        "remove_from_cart",
         "update_cart_item",
         "check_cart",
         "clear_cart",
@@ -340,15 +339,16 @@ def test_default_tools_list_keeps_internal_cart_tools_app_only() -> None:
 
     tools_by_name = {tool["name"]: tool for tool in response["result"]["tools"]}
     assert "sync_cart" in tools_by_name
-    assert "remove_from_cart" in tools_by_name
+    assert "remove_from_cart" not in tools_by_name
     assert "add_to_cart" in tools_by_name
     assert "update_cart_item" in tools_by_name
     assert "clear_cart" in tools_by_name
-    for name in ("sync_cart", "remove_from_cart"):
-        meta = tools_by_name[name]["_meta"]
-        assert meta["ui"]["visibility"] == ["app"]
-        assert meta["openai/visibility"] == "private"
-        assert meta["openai/widgetAccessible"] is True
+    meta = tools_by_name["sync_cart"]["_meta"]
+    assert meta["ui"]["visibility"] == ["app"]
+    assert meta["openai/visibility"] == "private"
+    assert meta["openai/widgetAccessible"] is True
+    assert "outputTemplate" not in tools_by_name["sync_cart"]
+    assert "openai/outputTemplate" not in meta
 
 
 def test_widget_resource_uses_products_template() -> None:

@@ -12,7 +12,6 @@ from app.interfaces.mcp.tools.cart_tools import (
     check_cart,
     clear_active_cart,
     clear_cart,
-    remove_from_cart,
     sync_cart,
     update_cart_item,
 )
@@ -29,7 +28,6 @@ WIDGET_ACCESSIBLE_TOOL_NAMES = {
     "search_products",
     "submit_order",
     "add_to_cart",
-    "remove_from_cart",
     "clear_cart",
     "update_cart_item",
     "check_cart",
@@ -191,28 +189,6 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
                 "invoked": "Cart updated.",
             },
         ),
-        "remove_from_cart": ToolDefinition(
-            name="remove_from_cart",
-            title="Remove from cart",
-            description=(
-                "Compatibility cart-session tool. Prefer update_cart_item with quantity 0 "
-                "for user-facing remove actions."
-            ),
-            input_schema=_cart_mutation_schema(require_product_id=True),
-            handler=_remove_from_cart_handler,
-            output_template=WIDGET_OUTPUT_TEMPLATE,
-            ui=widget_ui_config,
-            visibility="internal",
-            annotations={
-                "readOnlyHint": False,
-                "openWorldHint": False,
-                "destructiveHint": False,
-            },
-            tool_invocation={
-                "invoking": "Removing product from cart...",
-                "invoked": "Cart updated.",
-            },
-        ),
         "clear_cart": ToolDefinition(
             name="clear_cart",
             title="Clear cart",
@@ -294,7 +270,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             ),
             input_schema=_cart_mutation_schema(),
             handler=_sync_cart_handler,
-            output_template=WIDGET_OUTPUT_TEMPLATE,
+            output_template="",
             ui=widget_ui_config,
             visibility="internal",
             annotations={
@@ -492,11 +468,9 @@ def _resolve_widget_page(tool_name: str) -> str:
         return "search"
     if tool_name in {
         "add_to_cart",
-        "remove_from_cart",
         "update_cart_item",
         "clear_cart",
         "check_cart",
-        "sync_cart",
     }:
         return "cart"
     if tool_name == "open_checkout":
@@ -596,10 +570,6 @@ def _submit_order_handler(arguments: dict[str, Any]) -> dict[str, Any]:
 
 def _add_to_cart_handler(arguments: dict[str, Any]) -> dict[str, Any]:
     return _apply_open_widget_preference(add_to_cart(arguments), arguments)
-
-
-def _remove_from_cart_handler(arguments: dict[str, Any]) -> dict[str, Any]:
-    return _apply_open_widget_preference(remove_from_cart(arguments), arguments)
 
 
 def _clear_cart_handler(arguments: dict[str, Any]) -> dict[str, Any]:

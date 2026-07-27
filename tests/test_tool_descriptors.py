@@ -74,15 +74,10 @@ def test_cart_tools_are_registered_for_text_control() -> None:
         registry["search_products"].input_schema["properties"]["open_widget"]["type"] == "boolean"
     )
     assert registry["add_to_cart"].input_schema["properties"]["open_widget"]["type"] == "boolean"
-    assert registry["remove_from_cart"].visibility == "internal"
-    remove_payload = tool_registry.serialize_tool_definition(registry["remove_from_cart"])
-    assert remove_payload["_meta"]["ui"]["visibility"] == ["app"]
-    assert remove_payload["_meta"]["openai/visibility"] == "private"
-    assert remove_payload["_meta"]["openai/widgetAccessible"] is True
+    assert "remove_from_cart" not in registry
     assert registry["update_cart_item"].input_schema["properties"]["quantity"]["minimum"] == 0
     for name in (
         "add_to_cart",
-        "remove_from_cart",
         "update_cart_item",
         "check_cart",
         "clear_cart",
@@ -115,10 +110,23 @@ def test_sync_cart_tool_is_registered_for_widget_bootstrap() -> None:
     assert payload["_meta"]["ui"]["visibility"] == ["app"]
     assert payload["_meta"]["openai/visibility"] == "private"
     assert payload["_meta"]["openai/widgetAccessible"] is True
-    assert payload["outputTemplate"] == WIDGET_TEMPLATE_URI
-    assert payload["_meta"]["openai/outputTemplate"] == WIDGET_TEMPLATE_URI
+    assert "outputTemplate" not in payload
+    assert "openai/outputTemplate" not in payload["_meta"]
+    assert "resourceUri" not in payload["_meta"]["ui"]
     assert registry["sync_cart"].annotations["readOnlyHint"] is False
     assert registry["sync_cart"].annotations["destructiveHint"] is False
+
+
+def test_internal_tools_do_not_bind_widget_templates() -> None:
+    registry = tool_registry.create_tool_registry()
+
+    for tool in registry.values():
+        payload = tool_registry.serialize_tool_definition(tool)
+        if payload["_meta"].get("openai/visibility") != "private":
+            continue
+        assert "outputTemplate" not in payload
+        assert "openai/outputTemplate" not in payload["_meta"]
+        assert "resourceUri" not in payload["_meta"].get("ui", {})
 
 
 def test_theme_and_language_tools_are_registered_for_text_control() -> None:
