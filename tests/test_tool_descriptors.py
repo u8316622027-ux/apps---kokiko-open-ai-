@@ -85,6 +85,10 @@ def test_sync_cart_tool_is_registered_for_widget_bootstrap() -> None:
     registry = tool_registry.create_tool_registry()
     payload = tool_registry.serialize_tool_definition(registry["sync_cart"])
 
+    assert registry["sync_cart"].visibility == "internal"
+    assert payload["_meta"]["ui"]["visibility"] == ["app"]
+    assert payload["_meta"]["openai/visibility"] == "private"
+    assert payload["_meta"]["openai/widgetAccessible"] is True
     assert payload["outputTemplate"] == WIDGET_TEMPLATE_URI
     assert payload["_meta"]["openai/outputTemplate"] == WIDGET_TEMPLATE_URI
     assert registry["sync_cart"].annotations["readOnlyHint"] is False

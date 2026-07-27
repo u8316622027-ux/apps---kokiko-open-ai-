@@ -70,7 +70,7 @@ def _get_default_tool_registry() -> dict[str, ToolDefinition]:
 @lru_cache(maxsize=1)
 def _get_default_tools_list_payload() -> dict[str, Any]:
     registry = _get_default_tool_registry()
-    return {"tools": [serialize_tool_definition(tool) for tool in registry.values()]}
+    return {"tools": [serialize_tool_definition(tool) for tool in _listable_tools(registry)]}
 
 
 def _reset_server_caches_for_tests() -> None:
@@ -144,6 +144,10 @@ def _record_tool_result(
         tool_payload["latency_total_ms"] = (
             float(tool_payload.get("latency_total_ms", 0.0)) + latency_ms
         )
+
+
+def _listable_tools(registry: Mapping[str, ToolDefinition]) -> list[ToolDefinition]:
+    return [tool for tool in registry.values() if tool.visibility == "public"]
 
 
 def handle_rpc_request(
@@ -257,7 +261,9 @@ def handle_rpc_request(
             tools_result = _get_default_tools_list_payload()
         else:
             tools_result = {
-                "tools": [serialize_tool_definition(tool) for tool in active_registry.values()]
+                "tools": [
+                    serialize_tool_definition(tool) for tool in _listable_tools(active_registry)
+                ]
             }
         return {
             "jsonrpc": "2.0",

@@ -257,6 +257,60 @@ def test_tools_list_cache_refreshes_after_reset(monkeypatch: pytest.MonkeyPatch)
     assert second["tools"][0]["ui"]["domain"] == "https://example-b.test"
 
 
+def test_tools_list_hides_internal_tools_but_keeps_them_callable() -> None:
+    registry = {
+        "public_demo": tool_registry.ToolDefinition(
+            name="public_demo",
+            description="Public demo",
+            input_schema={"type": "object", "properties": {}},
+            handler=lambda _: {"status": "public"},
+            output_template="",
+            ui={},
+        ),
+        "internal_demo": tool_registry.ToolDefinition(
+            name="internal_demo",
+            description="Internal demo",
+            input_schema={"type": "object", "properties": {}},
+            handler=lambda _: {"status": "internal"},
+            output_template="",
+            ui={},
+            visibility="internal",
+        ),
+    }
+
+    list_response = mcp_server.handle_rpc_request(
+        {"jsonrpc": "2.0", "id": "1", "method": "tools/list"},
+        registry=registry,
+    )
+    tool_names = [tool["name"] for tool in list_response["result"]["tools"]]
+
+    assert tool_names == ["public_demo"]
+
+    call_response = mcp_server.handle_rpc_request(
+        {
+            "jsonrpc": "2.0",
+            "id": "2",
+            "method": "tools/call",
+            "params": {"name": "internal_demo", "arguments": {}},
+        },
+        registry=registry,
+    )
+
+    assert call_response["result"]["structuredContent"]["status"] == "internal"
+
+
+def test_default_tools_list_hides_sync_cart_from_user_tools() -> None:
+    mcp_server._reset_server_caches_for_tests()
+
+    response = mcp_server.handle_rpc_request({"jsonrpc": "2.0", "id": "1", "method": "tools/list"})
+
+    tool_names = [tool["name"] for tool in response["result"]["tools"]]
+    assert "sync_cart" not in tool_names
+    assert "add_to_cart" in tool_names
+    assert "update_cart_item" in tool_names
+    assert "clear_cart" in tool_names
+
+
 def test_widget_resource_uses_products_template() -> None:
     mcp_server._reset_server_caches_for_tests()
 

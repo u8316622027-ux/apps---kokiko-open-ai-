@@ -264,6 +264,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             handler=_sync_cart_handler,
             output_template=WIDGET_OUTPUT_TEMPLATE,
             ui=widget_ui_config,
+            visibility="internal",
             annotations={
                 "readOnlyHint": False,
                 "openWorldHint": False,
@@ -407,6 +408,10 @@ def serialize_tool_definition(tool: ToolDefinition) -> dict[str, Any]:
             payload["_meta"]["openai/toolInvocation/invoking"] = tool.tool_invocation["invoking"]
         if tool.tool_invocation.get("invoked"):
             payload["_meta"]["openai/toolInvocation/invoked"] = tool.tool_invocation["invoked"]
+    if tool.visibility == "internal":
+        payload["_meta"]["ui"] = {"visibility": ["app"]}
+        payload["_meta"]["openai/visibility"] = "private"
+        payload["_meta"]["openai/widgetAccessible"] = True
     if tool.output_template:
         payload["outputTemplate"] = tool.output_template
         payload["_meta"]["openai/outputTemplate"] = tool.output_template
