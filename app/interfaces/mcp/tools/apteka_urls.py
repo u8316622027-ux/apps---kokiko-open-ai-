@@ -9,7 +9,7 @@ from app.core.env import read_env_file_value
 
 ENV_FILE_PATH = Path(__file__).resolve().parents[4] / ".env"
 DEFAULT_APTEKA_BASE_URL = "https://api.apteka.md"
-DEFAULT_APTEKA_ORDER_BASE_URL = "https://stage.apteka.md"
+DEFAULT_APTEKA_ORDER_BASE_URL = "https://api.apteka.md"
 
 
 def get_apteka_base_url() -> str:

@@ -1504,10 +1504,12 @@ test("products checkout shows a dedicated success screen after submit and resets
   await page.locator("#products-checkout-flow-continue").click();
 
   await expect(page.locator("#products-checkout-flow")).toBeHidden();
-  await expect(page.locator("#products-cart-items")).toBeVisible();
-  await expect(page.locator("#products-cart-items")).toContainText(
-    /Cart is empty|Корзина пуста|Coșul este gol/,
+  await expect(page.locator("#products-cart-layer")).toBeHidden();
+  await expect(page.locator("#products-cart-button")).toHaveAttribute(
+    "aria-expanded",
+    "false",
   );
+  await expect(page.locator("#product-track")).toBeVisible();
 });
 
 test("products checkout re-syncs cart on every entry into the review step", async ({

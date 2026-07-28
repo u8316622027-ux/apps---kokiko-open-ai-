@@ -129,6 +129,7 @@
     }
     if (checkoutAction.dataset.checkoutAction === "continue") {
       actions.closeCheckout();
+      actions.closeCart();
     }
   });
 

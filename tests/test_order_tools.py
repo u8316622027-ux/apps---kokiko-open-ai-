@@ -315,14 +315,14 @@ def test_kokiko_order_client_uses_site_cart_and_order_endpoints(
     assert requests[2][0].get_header("Market") == "kokikomd"
 
 
-def test_order_submission_client_uses_stage_order_base(
+def test_order_submission_client_uses_configured_order_base(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("APTEKA_BASE_URL", "https://api.example")
-    monkeypatch.setenv("APTEKA_ORDER_BASE_URL", "https://stage.example")
+    monkeypatch.setenv("APTEKA_ORDER_BASE_URL", "https://orders.example")
     requests = []
     responses = [
-        '{"accessToken":"stage-cart-token","tokenType":"Bearer"}',
+        '{"accessToken":"order-cart-token","tokenType":"Bearer"}',
         "{}",
         '{"id":880001}',
     ]
@@ -342,11 +342,11 @@ def test_order_submission_client_uses_stage_order_base(
         platform="web",
     )
 
-    assert token == "stage-cart-token"
+    assert token == "order-cart-token"
     assert [request.full_url for request, _timeout in requests] == [
-        "https://stage.example/api/v1/front/cart",
-        "https://stage.example/api/v1/front/cart/update",
-        "https://stage.example/api/v1/front/order/confirm-order-by-using-mobile",
+        "https://orders.example/api/v1/front/cart",
+        "https://orders.example/api/v1/front/cart/update",
+        "https://orders.example/api/v1/front/order/confirm-order-by-using-mobile",
     ]
 
 
