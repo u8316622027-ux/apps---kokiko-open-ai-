@@ -23,7 +23,7 @@ def test_set_widget_theme_returns_widget_payload() -> None:
     assert payload["theme"] == "dark"
     assert payload["theme_mode"] == "manual"
     assert payload["language"] == "ro"
-    assert payload["widget_page"] == "default"
+    assert payload["widget_page"] == "search"
 
 
 def test_set_widget_theme_supports_auto_mode() -> None:
@@ -41,6 +41,7 @@ def test_set_widget_language_returns_two_supported_languages() -> None:
     assert payload["language"] == "ro"
     assert payload["theme"] == "dark"
     assert payload["supported_languages"] == ["ru", "ro"]
+    assert payload["widget_page"] == "search"
 
 
 @pytest.mark.parametrize(
@@ -70,11 +71,13 @@ def test_open_checkout_returns_checkout_widget_page() -> None:
                 ],
             },
             "language": "ru",
+            "checkout_step": "address",
         }
     )
 
     assert payload["status"] == "ok"
     assert payload["widget_page"] == "checkout"
+    assert payload["checkout_step"] == "address"
     assert "token" not in payload["cart"]
     assert payload["cart"]["items"][0]["quantity"] == 2
 

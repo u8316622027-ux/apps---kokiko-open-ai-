@@ -2080,6 +2080,120 @@ test("products widget applies cart payload from text tools", async ({
   );
 });
 
+test("products widget opens final cart for search-and-add tool payload", async ({
+  page,
+}) => {
+  const htmlPath = path.resolve(process.cwd(), "app/widgets/products.html");
+  const htmlUrl = `file:///${htmlPath.replace(/\\/g, "/")}`;
+
+  await page.addInitScript(() => {
+    window.localStorage.clear();
+    window.__APTEKA_WIDGET_PAYLOAD__ = {
+      action: "search_add",
+      query: "маска",
+      widget_page: "cart",
+      widget: { open: { page: "cart" } },
+      products: [
+        {
+          id: "mask-1",
+          name: "Mond'Sub Гидрогелевая маска для лица 28 г",
+          price: 18.75,
+          image_url: "https://api.apteka.md/media/mask.webp",
+        },
+      ],
+      cart: {
+        items: [
+          {
+            id: "mask-1",
+            name: "Mond'Sub Гидрогелевая маска для лица 28 г",
+            price: 18.75,
+            quantity: 5,
+            image_url: "https://api.apteka.md/media/mask.webp",
+          },
+        ],
+      },
+    };
+  });
+
+  await page.goto(htmlUrl, { waitUntil: "domcontentloaded" });
+
+  await expect(page.locator("#products-cart-panel")).toBeVisible();
+  await expect(page.locator("#products-cart-items")).toContainText("Mond'Sub");
+  await expect(page.locator("#products-cart-total")).toContainText("93.75 MDL");
+});
+
+test("products widget opens requested checkout address step from tool payload", async ({
+  page,
+}) => {
+  const htmlPath = path.resolve(process.cwd(), "app/widgets/products.html");
+  const htmlUrl = `file:///${htmlPath.replace(/\\/g, "/")}`;
+
+  await page.addInitScript(() => {
+    window.localStorage.clear();
+    window.__APTEKA_WIDGET_PAYLOAD__ = {
+      widget_page: "checkout",
+      checkout_step: "address",
+      widget: { open: { page: "checkout" } },
+      cart: {
+        items: [
+          {
+            id: "cream-1",
+            name: "Face cream",
+            price: 99,
+            quantity: 1,
+            product_url: "https://www.kokiko.md/ru/product/face-cream",
+          },
+        ],
+      },
+    };
+  });
+
+  await page.goto(htmlUrl, { waitUntil: "domcontentloaded" });
+
+  await expect(page.locator("#products-cart-panel")).toBeVisible();
+  await expect(page.locator("#products-checkout-flow")).toBeVisible();
+  await expect(page.locator('[data-checkout-step="address"]')).toBeVisible();
+  await expect(page.locator('[data-checkout-step="delivery"]')).toBeHidden();
+});
+
+test("products widget reads search payload from tool result content text", async ({
+  page,
+}) => {
+  const htmlPath = path.resolve(process.cwd(), "app/widgets/products.html");
+  const htmlUrl = `file:///${htmlPath.replace(/\\/g, "/")}`;
+
+  await page.addInitScript(() => {
+    window.localStorage.clear();
+    window.openai = {
+      toolResult: {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              widget_page: "search",
+              query: "крем",
+              products: [
+                {
+                  id: "cream-1",
+                  name: "Face cream",
+                  price: 99,
+                  image_url: "https://api.apteka.md/media/cream.webp",
+                },
+              ],
+            }),
+          },
+        ],
+      },
+    };
+  });
+
+  await page.goto(htmlUrl, { waitUntil: "domcontentloaded" });
+
+  await expect(page.locator(".product-card")).toHaveCount(1);
+  await expect(page.locator(".product-card")).toContainText("Face cream");
+  await expect(page.locator("#products-search-input")).toHaveValue("крем");
+});
+
 for (const viewport of [
   { width: 320, height: 720 },
   { width: 768, height: 720 },

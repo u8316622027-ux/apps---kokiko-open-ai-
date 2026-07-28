@@ -37,6 +37,12 @@ def test_create_tool_registry_uses_base_handlers() -> None:
 
 def test_resolve_widget_page_varies_by_tool() -> None:
     assert tool_registry._resolve_widget_page("search_products") == "search"
+    assert tool_registry._resolve_widget_page("set_widget_theme") == "search"
+    assert tool_registry._resolve_widget_page("set_widget_language") == "search"
+    assert tool_registry._resolve_widget_page("add_to_cart") == "cart"
+    assert tool_registry._resolve_widget_page("update_cart_item") == "cart"
+    assert tool_registry._resolve_widget_page("check_cart") == "cart"
+    assert tool_registry._resolve_widget_page("open_checkout") == "checkout"
     assert tool_registry._resolve_widget_page("unknown_tool") == "default"
 
 
@@ -161,7 +167,7 @@ def test_clear_cart_tool_empties_active_cart_for_next_widget() -> None:
     assert clear_payload["action"] == "clear"
     assert clear_payload["cart"]["count"] == 0
     assert clear_payload["cart"]["items"] == []
-    assert "widget" not in clear_payload
+    assert clear_payload["widget"]["open"]["page"] == "cart"
     assert check_payload["cart"]["count"] == 0
     assert check_payload["cart"]["items"] == []
 
@@ -174,7 +180,7 @@ def test_clear_then_add_only_final_cart_widget_opens() -> None:
                 "jsonrpc": "2.0",
                 "id": "1",
                 "method": "tools/call",
-                "params": {"name": "clear_cart", "arguments": {}},
+                "params": {"name": "clear_cart", "arguments": {"open_widget": False}},
             }
         )
         add_response = mcp_server.handle_rpc_request(

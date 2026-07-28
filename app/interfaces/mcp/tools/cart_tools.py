@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import threading
 from typing import Any, Protocol
 
@@ -130,11 +131,11 @@ def update_cart_item(
 ) -> dict[str, Any]:
     """Set a product quantity in a cart payload."""
 
-    product_id = _normalize_text(arguments.get("product_id") or arguments.get("id"))
-    if not product_id:
-        raise ValueError("product_id is required")
-    quantity = _normalize_quantity(arguments.get("quantity"), minimum=0)
     cart_items, cart_token = _resolve_cart(arguments)
+    product_id = _resolve_cart_product_id(arguments, cart_items)
+    if not product_id:
+        raise ValueError("product_id or matching product_name is required")
+    quantity = _normalize_quantity(arguments.get("quantity"), minimum=0)
     action = "update"
     if quantity == 0:
         cart_items = [item for item in cart_items if item["id"] != product_id]
@@ -369,6 +370,81 @@ def _find_item(items: list[dict[str, Any]], product_id: str) -> dict[str, Any] |
         if item["id"] == product_id:
             return item
     return None
+
+
+def _resolve_cart_product_id(arguments: dict[str, Any], items: list[dict[str, Any]]) -> str:
+    product_id = _normalize_text(arguments.get("product_id") or arguments.get("id"))
+    if product_id:
+        return product_id
+
+    product_name = _normalize_text(
+        arguments.get("product_name")
+        or arguments.get("name")
+        or arguments.get("query")
+        or arguments.get("title")
+    )
+    if not product_name:
+        return ""
+
+    normalized_query = _normalize_match_text(product_name)
+    for item in items:
+        item_name = _normalize_match_text(item.get("name"))
+        if normalized_query and (normalized_query in item_name or item_name in normalized_query):
+            return str(item["id"])
+
+    query_tokens = _match_tokens(product_name)
+    if not query_tokens:
+        return ""
+    for item in items:
+        item_tokens = _match_tokens(item.get("name"))
+        if query_tokens.issubset(item_tokens):
+            return str(item["id"])
+    return ""
+
+
+def _match_tokens(value: Any) -> set[str]:
+    return {
+        _stem_match_token(token)
+        for token in re.findall(r"[\w']+", _normalize_match_text(value))
+        if len(_stem_match_token(token)) >= 3
+    }
+
+
+def _stem_match_token(token: str) -> str:
+    normalized = token.strip("'")
+    for suffix in (
+        "ями",
+        "ами",
+        "ого",
+        "ему",
+        "ыми",
+        "ими",
+        "ой",
+        "ую",
+        "ая",
+        "ое",
+        "ые",
+        "ий",
+        "ый",
+        "ой",
+        "ам",
+        "ах",
+        "ом",
+        "ем",
+        "у",
+        "а",
+        "я",
+        "и",
+        "ы",
+        "е",
+    ):
+        if len(normalized) > len(suffix) + 3 and normalized.endswith(suffix):
+            return normalized[: -len(suffix)]
+    return normalized
+
+
+def _normalize_match_text(value: Any) -> str:
+    return _normalize_text(value).casefold()
 
 
 def _normalize_price(value: Any) -> float:

@@ -38,6 +38,18 @@
       ).toLowerCase();
     };
 
+    const extractCheckoutStep = (payload) => {
+      if (!payload || typeof payload !== "object") {
+        return "";
+      }
+      const step = normalizeText(
+        payload.checkout_step || payload.checkoutStep || payload.step,
+      ).toLowerCase();
+      return ["delivery", "address", "review", "success"].includes(step)
+        ? step
+        : "";
+    };
+
     const hasSearchResultsPayload = (payload) => {
       if (!payload || typeof payload !== "object") {
         return false;
@@ -106,6 +118,56 @@
       return true;
     };
 
+    const parsePayloadText = (value) => {
+      const text = normalizeText(value);
+      if (!text || !text.startsWith("{")) {
+        return null;
+      }
+      try {
+        const parsed = JSON.parse(text);
+        return parsed && typeof parsed === "object" ? parsed : null;
+      } catch (_error) {
+        return null;
+      }
+    };
+
+    const unwrapToolPayload = (candidate) => {
+      if (!candidate || typeof candidate !== "object") {
+        return null;
+      }
+      const nestedCandidates = [
+        candidate.structuredContent,
+        candidate.result?.structuredContent,
+        candidate.result,
+        candidate.payload?.structuredContent,
+        candidate.payload,
+        candidate.data?.structuredContent,
+        candidate.data,
+        candidate,
+      ];
+      for (const nested of nestedCandidates) {
+        if (!nested || typeof nested !== "object") {
+          continue;
+        }
+        if (nested !== candidate) {
+          const unwrapped = unwrapToolPayload(nested);
+          if (unwrapped) {
+            return unwrapped;
+          }
+        }
+        if (Array.isArray(nested.content)) {
+          for (const contentItem of nested.content) {
+            const parsed = parsePayloadText(contentItem?.text);
+            if (parsed) {
+              return parsed;
+            }
+          }
+        }
+        return nested;
+      }
+      return null;
+    };
+
     const extractInitialToolPayload = () => {
       const candidates = [
         window.__APTEKA_WIDGET_PAYLOAD__,
@@ -125,10 +187,10 @@
         if (!candidate || typeof candidate !== "object") {
           continue;
         }
-        return candidate.structuredContent &&
-          typeof candidate.structuredContent === "object"
-          ? candidate.structuredContent
-          : candidate;
+        const payload = unwrapToolPayload(candidate);
+        if (payload) {
+          return payload;
+        }
       }
       return null;
     };
@@ -149,10 +211,10 @@
         if (!candidate || typeof candidate !== "object") {
           continue;
         }
-        return candidate.structuredContent &&
-          typeof candidate.structuredContent === "object"
-          ? candidate.structuredContent
-          : candidate;
+        const payload = unwrapToolPayload(candidate);
+        if (payload) {
+          return payload;
+        }
       }
       return null;
     };
@@ -182,11 +244,7 @@
           // ignore storage write errors
         }
       }
-      const isSearchPayload =
-        hasSearchResultsPayload(payload) ||
-        !requestedPage ||
-        requestedPage === "search";
-      if (isSearchPayload) {
+      if (hasSearchResultsPayload(payload)) {
         const mapped = extractItems(payload)
           .map(mapProduct)
           .filter((product) => product.id);
@@ -195,17 +253,44 @@
         }
         state.products = mapped;
         state.lastQuery = query;
+      }
+      if (
+        cartApplied &&
+        (requestedPage === "cart" || requestedPage === "checkout")
+      ) {
+        state.loadedOnce = true;
+        window.setTimeout(() => {
+          if (requestedPage === "checkout") {
+            ctx.actions.openCart();
+            ctx.actions.openCheckout();
+            const checkoutStep = extractCheckoutStep(payload);
+            if (
+              checkoutStep &&
+              typeof ctx.actions.setCheckoutStep === "function"
+            ) {
+              ctx.actions.setCheckoutStep(checkoutStep);
+            }
+            return;
+          }
+          ctx.actions.openCart();
+        }, 0);
+        return true;
+      }
+      const isSearchPayload =
+        hasSearchResultsPayload(payload) ||
+        !requestedPage ||
+        requestedPage === "search";
+      if (isSearchPayload) {
+        if (query && input) {
+          input.value = query;
+        }
+        state.lastQuery = query;
         state.loadedOnce = true;
         return true;
       }
       if (cartApplied) {
         state.loadedOnce = true;
         window.setTimeout(() => {
-          if (requestedPage === "checkout") {
-            ctx.actions.openCart();
-            ctx.actions.openCheckout();
-            return;
-          }
           ctx.actions.openCart();
         }, 0);
         return true;

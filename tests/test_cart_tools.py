@@ -184,6 +184,35 @@ def test_update_cart_item_zero_quantity_removes_item_and_clears_live_cart() -> N
     assert client.calls == [("clear_cart", {"token": "existing-token", "language": "ru"})]
 
 
+def test_update_cart_item_can_remove_active_item_by_product_name() -> None:
+    add_to_cart(
+        {
+            "product": {
+                "id": "mask-1",
+                "name": "Mond'Sub Гидрогелевая маска для лица 28 г",
+                "price": 18.75,
+                "quantity": 5,
+            }
+        }
+    )
+    add_to_cart(
+        {
+            "product": {
+                "id": "shampoo-1",
+                "name": "LORENAY Mickey Mouse Bubble Bath & Shampoo 475 ml",
+                "price": 72.97,
+                "quantity": 1,
+            }
+        }
+    )
+
+    payload = update_cart_item({"product_name": "маска для лица", "quantity": 0})
+
+    assert payload["action"] == "remove"
+    assert payload["cart"]["count"] == 1
+    assert payload["cart"]["items"][0]["id"] == "shampoo-1"
+
+
 def test_update_cart_item_reuses_existing_kokiko_cart_token() -> None:
     client = FakeCartClient()
 

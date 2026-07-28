@@ -258,7 +258,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             ),
             input_schema=_cart_mutation_schema(),
             handler=_clear_cart_handler,
-            output_template="",
+            output_template=WIDGET_OUTPUT_TEMPLATE,
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": False,
@@ -277,10 +277,11 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
                 "Set product quantity in a cart payload for text-driven cart control, "
                 "remove the product when quantity is 0, "
                 "sync numeric product ids to Kokiko cart API, and return "
-                "structuredContent.cart with the current items, count, total, and sync status."
+                "structuredContent.cart with the current items, count, total, and sync status. "
+                "If product_id is unknown, call check_cart first or pass product_name so "
+                "the active cart can resolve the item by title."
             ),
             input_schema=_cart_mutation_schema(
-                require_product_id=True,
                 require_quantity=True,
                 quantity_minimum=0,
             ),
@@ -435,6 +436,14 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
                             "Set false when this checkout preparation is an intermediate step."
                         ),
                     },
+                    "checkout_step": {
+                        "type": "string",
+                        "enum": ["delivery", "address", "review"],
+                        "description": (
+                            "Step to open: delivery for pickup/courier choice, "
+                            "address for customer data, review for confirmation/payment."
+                        ),
+                    },
                 },
             },
             handler=_open_checkout_handler,
@@ -523,7 +532,11 @@ def decorate_tool_result(
 
 
 def _resolve_widget_page(tool_name: str) -> str:
-    if tool_name == "search_products":
+    if tool_name in {
+        "search_products",
+        "set_widget_theme",
+        "set_widget_language",
+    }:
         return "search"
     if tool_name == "search_and_add_to_cart":
         return "cart"
@@ -574,6 +587,13 @@ def _cart_mutation_schema(
                 ),
             },
             "product_id": {"type": "string"},
+            "product_name": {
+                "type": "string",
+                "description": (
+                    "Optional product name or user phrase for matching an item "
+                    "in the active cart when product_id is not known."
+                ),
+            },
             "quantity": {"type": "integer", "minimum": quantity_minimum},
             "language": {"type": "string"},
             "open_widget": {

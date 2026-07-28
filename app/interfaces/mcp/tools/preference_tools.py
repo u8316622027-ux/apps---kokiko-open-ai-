@@ -8,6 +8,7 @@ from app.interfaces.mcp.tools.cart_tools import get_active_cart_payload
 
 SUPPORTED_LANGUAGES = ["ru", "ro"]
 SUPPORTED_THEMES = ["light", "dark", "auto"]
+SUPPORTED_CHECKOUT_STEPS = ["delivery", "address", "review"]
 
 
 def set_widget_theme(arguments: dict[str, Any]) -> dict[str, Any]:
@@ -26,7 +27,7 @@ def set_widget_theme(arguments: dict[str, Any]) -> dict[str, Any]:
         "auto_disabled": not is_auto,
         "language": language,
         "supported_themes": SUPPORTED_THEMES,
-        "widget_page": "default",
+        "widget_page": "search",
     }
 
 
@@ -42,7 +43,7 @@ def set_widget_language(arguments: dict[str, Any]) -> dict[str, Any]:
         "action": "set_widget_language",
         "language": language,
         "supported_languages": SUPPORTED_LANGUAGES,
-        "widget_page": "default",
+        "widget_page": "search",
     }
     if theme:
         payload["theme"] = theme
@@ -55,6 +56,9 @@ def open_checkout(arguments: dict[str, Any]) -> dict[str, Any]:
     """Open the checkout widget with an optional cart payload."""
     language = _normalize_language(arguments.get("language")) or "ru"
     theme = _normalize_theme(arguments.get("theme"))
+    checkout_step = _normalize_checkout_step(
+        arguments.get("checkout_step") or arguments.get("step")
+    )
     cart = _normalize_cart_payload(arguments.get("cart") or arguments)
     if not cart["items"]:
         cart = get_active_cart_payload()["cart"]
@@ -65,6 +69,7 @@ def open_checkout(arguments: dict[str, Any]) -> dict[str, Any]:
         "language": language,
         "cart": cart,
         "widget_page": "checkout",
+        "checkout_step": checkout_step,
     }
     if theme:
         payload["theme"] = theme
@@ -91,6 +96,19 @@ def _normalize_language(value: Any) -> str:
     if normalized.startswith("ru"):
         return "ru"
     return ""
+
+
+def _normalize_checkout_step(value: Any) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in SUPPORTED_CHECKOUT_STEPS:
+        return normalized
+    if normalized.startswith("deliver") or normalized.startswith("достав"):
+        return "delivery"
+    if normalized.startswith("address") or normalized.startswith("адрес"):
+        return "address"
+    if normalized.startswith("review") or normalized.startswith("confirm"):
+        return "review"
+    return "delivery"
 
 
 def _normalize_cart_payload(raw_cart: Any) -> dict[str, Any]:
