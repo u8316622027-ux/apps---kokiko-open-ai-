@@ -95,8 +95,9 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": True,
-                "openWorldHint": True,
                 "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": True,
             },
             tool_invocation={
                 "invoking": "Searching products...",
@@ -152,8 +153,9 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": False,
-                "openWorldHint": False,
                 "destructiveHint": False,
+                "idempotentHint": False,
+                "openWorldHint": True,
             },
             tool_invocation={
                 "invoking": "Searching and updating cart...",
@@ -213,8 +215,9 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": False,
-                "openWorldHint": False,
-                "destructiveHint": False,
+                "destructiveHint": True,
+                "idempotentHint": False,
+                "openWorldHint": True,
             },
             tool_invocation={
                 "invoking": "Submitting order...",
@@ -240,8 +243,9 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": False,
-                "openWorldHint": False,
                 "destructiveHint": False,
+                "idempotentHint": False,
+                "openWorldHint": True,
             },
             tool_invocation={
                 "invoking": "Adding product to cart...",
@@ -262,8 +266,9 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": False,
-                "openWorldHint": False,
                 "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": True,
             },
             tool_invocation={
                 "invoking": "Clearing cart...",
@@ -290,8 +295,9 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": False,
-                "openWorldHint": False,
                 "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": True,
             },
             tool_invocation={
                 "invoking": "Updating cart...",
@@ -311,8 +317,9 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": True,
-                "openWorldHint": False,
                 "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": False,
             },
             tool_invocation={
                 "invoking": "Checking cart...",
@@ -335,8 +342,9 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             visibility="internal",
             annotations={
                 "readOnlyHint": False,
-                "openWorldHint": False,
                 "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": True,
             },
             tool_invocation={
                 "invoking": "Syncing cart...",
@@ -368,8 +376,9 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": False,
-                "openWorldHint": False,
                 "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": False,
             },
             tool_invocation={
                 "invoking": "Switching theme...",
@@ -399,8 +408,9 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": False,
-                "openWorldHint": False,
                 "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": False,
             },
             tool_invocation={
                 "invoking": "Switching language...",
@@ -451,8 +461,9 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": True,
-                "openWorldHint": False,
                 "destructiveHint": False,
+                "idempotentHint": True,
+                "openWorldHint": False,
             },
             tool_invocation={
                 "invoking": "Opening checkout...",
