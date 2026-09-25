@@ -452,7 +452,7 @@ def _build_send_order_payload(
         "payment": _build_payment_payload(arguments),
         "dontCallMe": bool(arguments.get("dont_call_me", False)),
         "delivery": delivery_payload,
-        "orderType": "online",
+        "orderType": "ai apps",
     }
 
 

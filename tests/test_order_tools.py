@@ -127,7 +127,7 @@ def test_submit_order_returns_received_payload() -> None:
     assert sent_order["platform"] == "web"
     order_payload = sent_order["payload"]
     assert isinstance(order_payload, dict)
-    assert order_payload["orderType"] == "online"
+    assert order_payload["orderType"] == "ai apps"
     assert order_payload["note"] == "Call before delivery"
     assert order_payload["payment"] == {"type": "cash", "useBonuses": False}
     assert order_payload["delivery"] == {
@@ -297,7 +297,7 @@ def test_kokiko_order_client_uses_site_cart_and_order_endpoints(
     client.update_cart(token, [{"product_id": 123, "quantity": 2}], language="ru")
     client.send_order(
         token,
-        {"orderType": "online"},
+        {"orderType": "ai apps"},
         language="ru",
         platform="web",
     )
@@ -337,7 +337,7 @@ def test_order_submission_client_uses_configured_order_base(
     client.update_cart(token, [{"product_id": 123, "quantity": 2}], language="ru")
     client.send_order(
         token,
-        {"orderType": "online"},
+        {"orderType": "ai apps"},
         language="ru",
         platform="web",
     )
