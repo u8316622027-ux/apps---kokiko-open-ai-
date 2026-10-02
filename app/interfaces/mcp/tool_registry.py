@@ -153,7 +153,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": False,
-                "destructiveHint": False,
+                "destructiveHint": True,
                 "idempotentHint": False,
                 "openWorldHint": True,
             },
@@ -266,7 +266,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": False,
-                "destructiveHint": False,
+                "destructiveHint": True,
                 "idempotentHint": True,
                 "openWorldHint": True,
             },
@@ -295,7 +295,7 @@ def create_tool_registry() -> dict[str, ToolDefinition]:
             ui=widget_ui_config,
             annotations={
                 "readOnlyHint": False,
-                "destructiveHint": False,
+                "destructiveHint": True,
                 "idempotentHint": True,
                 "openWorldHint": True,
             },

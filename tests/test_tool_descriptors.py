@@ -44,7 +44,7 @@ def test_submit_order_tool_descriptor_allows_checkout_submission() -> None:
 
     assert "outputTemplate" not in payload
     assert payload["annotations"]["readOnlyHint"] is False
-    assert payload["annotations"]["destructiveHint"] is False
+    assert payload["annotations"]["destructiveHint"] is True
     assert payload["_meta"]["openai/toolInvocation/invoking"]
     assert payload["inputSchema"]["required"] == ["customer_name", "customer_phone", "items"]
     assert "live Kokiko" in payload["description"]
@@ -72,7 +72,9 @@ def test_cart_tools_are_registered_for_text_control() -> None:
         payload = tool_registry.serialize_tool_definition(registry[name])
         assert payload["outputTemplate"] == WIDGET_TEMPLATE_URI
         assert payload["_meta"]["openai/outputTemplate"] == WIDGET_TEMPLATE_URI
-        assert payload["annotations"]["destructiveHint"] is False
+        assert payload["annotations"]["destructiveHint"] is (
+            name in {"update_cart_item", "clear_cart", "search_and_add_to_cart"}
+        )
 
     assert registry["check_cart"].annotations["readOnlyHint"] is True
     assert registry["add_to_cart"].annotations["readOnlyHint"] is False
