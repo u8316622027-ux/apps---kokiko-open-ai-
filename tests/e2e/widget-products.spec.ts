@@ -3,6 +3,17 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
+type HostMessage = {
+  id?: string;
+  jsonrpc?: string;
+  method?: string;
+  result?: unknown;
+};
+
+type HostWindow = Window & {
+  __KOKIKO_HOST_MESSAGES__?: HostMessage[];
+};
+
 const DEFAULT_PRODUCTS = [
   {
     id: "cream-1",
@@ -41,6 +52,55 @@ test("products widget shell renders", async ({ page }) => {
   await expect(
     page.locator('[data-widget-shell="search_products"]'),
   ).toBeVisible();
+});
+
+test("products widget notifies the Apps host after initialize", async ({
+  page,
+}) => {
+  const htmlUrl = "http://127.0.0.1:4173/app/widgets/products.html";
+
+  await page.goto("http://127.0.0.1:4173/");
+  await page.evaluate((widgetUrl) => {
+    const hostWindow = window as HostWindow;
+    hostWindow.__KOKIKO_HOST_MESSAGES__ = [];
+    window.addEventListener("message", (event) => {
+      const message = event.data as HostMessage;
+      hostWindow.__KOKIKO_HOST_MESSAGES__?.push(message);
+
+      if (message?.method !== "ui/initialize" || !event.source) {
+        return;
+      }
+
+      event.source.postMessage(
+        {
+          jsonrpc: "2.0",
+          id: message.id,
+          result: {
+            protocolVersion: "2026-01-26",
+            hostInfo: { name: "playwright-host", version: "1.0.0" },
+            hostCapabilities: {},
+            hostContext: {},
+          },
+        },
+        "*",
+      );
+    });
+
+    const iframe = document.createElement("iframe");
+    iframe.src = widgetUrl;
+    document.body.appendChild(iframe);
+  }, htmlUrl);
+
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        () =>
+          (window as HostWindow).__KOKIKO_HOST_MESSAGES__?.some(
+            (message) => message.method === "ui/notifications/initialized",
+          ) ?? false,
+      ),
+    )
+    .toBe(true);
 });
 
 test("products widget supports cart quantity changes", async ({ page }) => {

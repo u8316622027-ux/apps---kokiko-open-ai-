@@ -2,7 +2,14 @@
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
   "files": {
     "ignoreUnknown": true,
-    "ignore": ["pytest-cache-files-*", "tests/.tmp", "test-results"]
+    "ignore": [
+      ".pytest_cache",
+      ".ruff_cache",
+      ".venv",
+      "pytest-cache-files-*",
+      "tests/.tmp",
+      "test-results"
+    ]
   },
   "formatter": {
     "enabled": true,
